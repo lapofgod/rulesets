@@ -74,7 +74,7 @@ USER-AGENT,Curl*
 `domain.list` 文件名保持不变，但内容是平台对应的 domain set 语义：
 - mihomo: `+.example.com`
 - surge/shadowrocket/loon: `.example.com`
-- sing-box: 输出 `domain.json`（可编译为 `domain.srs`）
+- sing-box: 统一输出 `rules.json`（可编译为 `rules.srs`）
 
 所有平台的 domain set 输出都会做去重和排序，保证产物稳定、diff 更干净。
 除 sing-box 外，所有生成规则文件都会带英文注释头，并包含 `Rule count`。
@@ -90,8 +90,8 @@ USER-AGENT,Curl*
 
 ## sing-box 说明
 
-- 默认同时产出：`endpoint.json` 与可直接使用的 `endpoint.srs`（仅非 domainset 模式）
-- 若自动升级为 domain set，则输出 `domain.json` 与 `domain.srs`
+- 不区分 domain/endpoint/ua，统一按规则顺序输出到 `rules.json`
+- 默认同时产出：`rules.json` 与可直接使用的 `rules.srs`
 - `USER-AGENT` 规则在不支持的客户端（mihomo/sing-box）不会输出对应文件
 - 若本地未安装 `sing-box`，可临时使用：
 
