@@ -1,0 +1,57 @@
+{
+  "single_source_of_truth": "src/*.conf (non-hidden)",
+  "ruleset_baseline": "mihomo",
+  "sources": [
+    {
+      "name": "audited",
+      "source": "src/audited.conf",
+      "rule_count": 76,
+      "group_count": {
+        "domain": 76,
+        "endpoint": 0,
+        "ua": 0,
+        "upgradable_domainset": true
+      }
+    },
+    {
+      "name": "check_ip",
+      "source": "src/check_ip.conf",
+      "rule_count": 18,
+      "group_count": {
+        "domain": 18,
+        "endpoint": 0,
+        "ua": 0,
+        "upgradable_domainset": true
+      }
+    },
+    {
+      "name": "conn_check",
+      "source": "src/conn_check.conf",
+      "rule_count": 17,
+      "group_count": {
+        "domain": 15,
+        "endpoint": 2,
+        "ua": 0,
+        "upgradable_domainset": false
+      }
+    },
+    {
+      "name": "wikimedia",
+      "source": "src/wikimedia.conf",
+      "rule_count": 22,
+      "group_count": {
+        "domain": 22,
+        "endpoint": 0,
+        "ua": 0,
+        "upgradable_domainset": true
+      }
+    }
+  ],
+  "targets": [
+    "surge",
+    "mihomo",
+    "shadowrocket",
+    "loon",
+    "sing-box"
+  ]
+}
