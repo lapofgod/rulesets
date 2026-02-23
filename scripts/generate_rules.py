@@ -21,18 +21,7 @@ PUBLISH_BRANCH = "generated"
 TARGETS = ["surge", "mihomo", "shadowrocket", "loon", "sing-box"]
 
 DOMAIN_KINDS = {"DOMAIN", "DOMAIN-SUFFIX", "DOMAIN-KEYWORD", "DOMAIN-WILDCARD"}
-DOMAINSET_CAPABLE_KINDS = {"DOMAIN", "DOMAIN-SUFFIX", "DOMAIN-WILDCARD"}
-ENDPOINT_KINDS = {
-    "IP-CIDR",
-    "IP-CIDR6",
-    "SRC-IP-CIDR",
-    "DST-PORT",
-    "DEST-PORT",
-    "SRC-PORT",
-    "GEOIP",
-    "URL-REGEX",
-}
-UA_KINDS = {"USER-AGENT"}
+ORIGIN_KINDS = {"USER-AGENT", "SRC-PORT"}
 
 
 @dataclass(frozen=True)
@@ -56,8 +45,7 @@ class Bundle:
 class RuleGroups:
     domain: list[Rule]
     endpoint: list[Rule]
-    ua: list[Rule]
-    upgradable_domainset: bool
+    origins: list[Rule]
 
 
 def normalize_kind(kind: str) -> str:
@@ -180,18 +168,17 @@ def map_rules_for_target(target: str, rules: list[Rule]) -> list[Rule]:
 def split_rules(rules: list[Rule]) -> RuleGroups:
     domain: list[Rule] = []
     endpoint: list[Rule] = []
-    ua: list[Rule] = []
+    origins: list[Rule] = []
 
     for rule in rules:
         if rule.kind in DOMAIN_KINDS:
             domain.append(rule)
-        elif rule.kind in UA_KINDS:
-            ua.append(rule)
+        elif rule.kind in ORIGIN_KINDS:
+            origins.append(rule)
         else:
             endpoint.append(rule)
 
-    upgradable_domainset = bool(rules) and all(rule.kind in DOMAINSET_CAPABLE_KINDS for rule in rules)
-    return RuleGroups(domain=domain, endpoint=endpoint, ua=ua, upgradable_domainset=upgradable_domainset)
+    return RuleGroups(domain=domain, endpoint=endpoint, origins=origins)
 
 
 def output_path(target: str, rule_type: str, filename: str) -> Path:
@@ -213,6 +200,12 @@ def write_type_readme(target: str, rule_type: str, filenames: list[str]) -> None
 
     if target == "mihomo":
         lines.extend(["## Mihomo Usage", ""])
+        lines.extend(
+            [
+                "Use `domains` + `endpoints` + `origins` in parallel when available.",
+                "",
+            ]
+        )
         for filename in sorted_files:
             rel_path = f"{base_path}/{filename}"
             raw_url = f"https://raw.githubusercontent.com/{GITHUB_REPO}/{PUBLISH_BRANCH}/{rel_path}"
@@ -246,6 +239,25 @@ def write_type_readme(target: str, rule_type: str, filenames: list[str]) -> None
                         "```yaml",
                         "rule-providers:",
                         f"  {provider_name}_endpoints:",
+                        "    type: http",
+                        "    behavior: classical",
+                        "    format: yaml",
+                        f"    url: {raw_url}",
+                        f"    path: ./ruleset/{provider_name}.yaml",
+                        "    interval: 86400",
+                        "```",
+                        "",
+                    ]
+                )
+            elif rule_type == "origins" and filename.endswith(".yaml"):
+                lines.extend(
+                    [
+                        f"### {filename}",
+                        "- Format: yaml",
+                        "- Behavior: classical",
+                        "```yaml",
+                        "rule-providers:",
+                        f"  {provider_name}_origins:",
                         "    type: http",
                         "    behavior: classical",
                         "    format: yaml",
@@ -371,7 +383,7 @@ def emit_one(bundle: Bundle, raw_rules: list[Rule], compile_srs: bool, generated
             remember(target, "endpoints", f"{bundle.name}.conf")
         if write_lines_with_header(
             output_path(target, "origins", f"{bundle.name}.conf"),
-            [rule.as_line for rule in groups.ua],
+            [rule.as_line for rule in groups.origins],
             generated_at,
         ):
             remember(target, "origins", f"{bundle.name}.conf")
@@ -388,10 +400,14 @@ def emit_one(bundle: Bundle, raw_rules: list[Rule], compile_srs: bool, generated
         out = output_path("mihomo", "endpoints", f"{bundle.name}.yaml")
         write_yaml_with_header(out, to_mihomo_payload(mihomo_groups.endpoint), len(mihomo_groups.endpoint), generated_at)
         remember("mihomo", "endpoints", f"{bundle.name}.yaml")
+    if mihomo_groups.origins:
+        out = output_path("mihomo", "origins", f"{bundle.name}.yaml")
+        write_yaml_with_header(out, to_mihomo_payload(mihomo_groups.origins), len(mihomo_groups.origins), generated_at)
+        remember("mihomo", "origins", f"{bundle.name}.yaml")
 
     sing_mapped = map_rules_for_target("sing-box", raw_rules)
     sing_groups = split_rules(sing_mapped)
-    sing_rules = [*sing_groups.domain, *sing_groups.endpoint]
+    sing_rules = [*sing_groups.domain, *sing_groups.endpoint, *sing_groups.origins]
     if sing_rules:
         rules_json = output_path("sing-box", "json", f"{bundle.name}.json")
         rules_json.parent.mkdir(parents=True, exist_ok=True)
@@ -429,8 +445,7 @@ def write_manifest(entries: list[tuple[Bundle, list[Rule]]]) -> None:
                 "group_count": {
                     "domain": len(split_rules(rules).domain),
                     "endpoint": len(split_rules(rules).endpoint),
-                    "ua": len(split_rules(rules).ua),
-                    "upgradable_domainset": split_rules(rules).upgradable_domainset,
+                    "origins": len(split_rules(rules).origins),
                 },
             }
             for bundle, rules in entries

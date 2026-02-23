@@ -66,10 +66,10 @@ USER-AGENT,Curl*
 
 ## 自动升级规则类型
 
-- 若 `.conf` 中**全部规则**都可表示为 domain set（`DOMAIN`/`DOMAIN-SUFFIX`/`DOMAIN-KEYWORD`/`DOMAIN-WILDCARD`），则输出到 `domains.list`。
-- 否则输出为 `endpoints` + `origins`：
-  - endpoint 会合并原先的 endpoint/other（包含 domain 类规则）
-  - origins 单独输出到 `origins.conf`（用于 USER-AGENT 等约束请求者来源的规则）
+- 原始规则中可表示为 domain set 的部分会拆分到 `domains`。
+- `USER-AGENT` 与 `SRC-PORT` 这类约束请求者来源的规则会拆分到 `origins`。
+- 其余规则才进入 `endpoints`。
+- sing-box 不做这种拆分，仍统一输出到 `json/<服务>.json`。
 
 `domains.list` 文件名保持不变，但内容是平台对应的 domain set 语义：
 - mihomo: `+.example.com`
@@ -86,7 +86,11 @@ USER-AGENT,Curl*
 - 域名前缀归一化：源里 `.baidu.com`、`+.baidu.com`、`*.baidu.com` 都先归一为 `DOMAIN-SUFFIX,baidu.com`，避免不同平台对点前缀语义差异。
 - 端口规则映射：源基准使用 `DST-PORT`，输出到 Surge / Shadowrocket 自动转成 `DEST-PORT`。
 - Loon 兼容：`DOMAIN-WILDCARD` 在 Loon 不支持，若值是 `*.example.com` 自动降级为 `DOMAIN-SUFFIX,example.com`，否则跳过。
-- UA 兼容：`USER-AGENT` 仅对支持的平台输出（Surge / Shadowrocket / Loon）。
+- Origin 兼容：`USER-AGENT` 仅对支持的平台输出；`SRC-PORT` 归类到 `origins`。
+
+## 使用建议
+
+推荐并列使用三类规则：`domains` + `endpoints` + `origins`，以获得更紧凑且语义清晰的策略组合。
 
 ## sing-box 说明
 
