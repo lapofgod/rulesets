@@ -58,18 +58,14 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          NEW_BRANCH="false"
           if git ls-remote --exit-code --heads origin "$TARGET_BRANCH" >/dev/null 2>&1; then
             git fetch origin "$TARGET_BRANCH"
             git checkout -B "$TARGET_BRANCH" "origin/$TARGET_BRANCH"
           else
             git checkout --orphan "$TARGET_BRANCH"
-            NEW_BRANCH="true"
           fi
 
-          if [ "$NEW_BRANCH" = "true" ]; then
-            find . -mindepth 1 -maxdepth 1 ! -name ".git" -exec rm -rf {} +
-          fi
+          find . -mindepth 1 -maxdepth 1 ! -name ".git" -exec rm -rf {} +
 
           for entry in "$PUBLISH_DIR"/* "$PUBLISH_DIR"/.[!.]* "$PUBLISH_DIR"/..?*; do
             [ -e "$entry" ] || continue

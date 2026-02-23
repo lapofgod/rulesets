@@ -6,6 +6,7 @@ import json
 import shutil
 import subprocess
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable
 
@@ -15,6 +16,8 @@ ROOT = Path(__file__).resolve().parent.parent
 SOURCE_ROOT = ROOT / "sources"
 OUTPUT_ROOT = ROOT / "generated"
 RULESET_BASELINE = "mihomo"
+GITHUB_REPO = "lapofgod/ruleset"
+PUBLISH_BRANCH = "generated"
 TARGETS = ["surge", "mihomo", "shadowrocket", "loon", "sing-box"]
 
 DOMAIN_KINDS = {"DOMAIN", "DOMAIN-SUFFIX", "DOMAIN-KEYWORD", "DOMAIN-WILDCARD"}
@@ -106,7 +109,7 @@ def write_lines(file_path: Path, lines: Iterable[str]) -> bool:
     return True
 
 
-def write_lines_with_header(file_path: Path, lines: Iterable[str]) -> bool:
+def write_lines_with_header(file_path: Path, lines: Iterable[str], generated_at: str) -> bool:
     line_list = list(lines)
     if not line_list:
         return False
@@ -114,6 +117,7 @@ def write_lines_with_header(file_path: Path, lines: Iterable[str]) -> bool:
     header = [
         "# Auto-generated file. Do not edit manually.",
         f"# Rule count: {len(line_list)}",
+        f"# Generated at: {generated_at}",
         "",
     ]
     file_path.parent.mkdir(parents=True, exist_ok=True)
@@ -121,10 +125,11 @@ def write_lines_with_header(file_path: Path, lines: Iterable[str]) -> bool:
     return True
 
 
-def write_yaml_with_header(file_path: Path, payload: dict, rule_count: int) -> None:
+def write_yaml_with_header(file_path: Path, payload: dict, rule_count: int, generated_at: str) -> None:
     header = [
         "# Auto-generated file. Do not edit manually.",
         f"# Rule count: {rule_count}",
+        f"# Generated at: {generated_at}",
         "",
     ]
     body = yaml.safe_dump(payload, allow_unicode=True, sort_keys=False)
@@ -188,6 +193,41 @@ def split_rules(rules: list[Rule]) -> RuleGroups:
 
 def output_path(target: str, bundle: Bundle, filename: str) -> Path:
     return OUTPUT_ROOT / target / bundle.name / filename
+
+
+def write_bundle_readme(target: str, bundle: Bundle, filenames: list[str]) -> None:
+    if not filenames:
+        return
+
+    sorted_files = sorted(set(filenames))
+    base_path = f"{target}/{bundle.name}"
+    lines: list[str] = [
+        f"# {target}/{bundle.name}",
+        "",
+        "This directory is auto-generated.",
+        "",
+        "## External URLs",
+        "",
+    ]
+
+    for filename in sorted_files:
+        rel_path = f"{base_path}/{filename}"
+        lines.extend(
+            [
+                f"### {filename}",
+                "",
+                f"- raw.githubusercontent.com: https://raw.githubusercontent.com/{GITHUB_REPO}/{PUBLISH_BRANCH}/{rel_path}",
+                f"- cdn.jsdelivr.net: https://cdn.jsdelivr.net/gh/{GITHUB_REPO}@{PUBLISH_BRANCH}/{rel_path}",
+                f"- fastly.jsdelivr.net: https://fastly.jsdelivr.net/gh/{GITHUB_REPO}@{PUBLISH_BRANCH}/{rel_path}",
+                f"- testingcf.jsdelivr.net: https://testingcf.jsdelivr.net/gh/{GITHUB_REPO}@{PUBLISH_BRANCH}/{rel_path}",
+                f"- gh-proxy: https://gh-proxy.org/https://github.com/{GITHUB_REPO}/blob/{PUBLISH_BRANCH}/{rel_path}",
+                "",
+            ]
+        )
+
+    readme_path = output_path(target, bundle, "README.MD")
+    readme_path.parent.mkdir(parents=True, exist_ok=True)
+    readme_path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
 
 
 def to_domainset_entry(target: str, rule: Rule) -> str | None:
@@ -259,29 +299,51 @@ def compile_sing_box(source_json: Path, out_srs: Path) -> None:
     subprocess.run([binary, "rule-set", "compile", "--output", str(out_srs), str(source_json)], check=True)
 
 
-def emit_one(bundle: Bundle, raw_rules: list[Rule], compile_srs: bool) -> None:
+def emit_one(bundle: Bundle, raw_rules: list[Rule], compile_srs: bool, generated_at: str) -> None:
     base_groups = split_rules(raw_rules)
+    generated_files: dict[str, list[str]] = {target: [] for target in TARGETS}
 
     for target in ["surge", "shadowrocket", "loon"]:
         mapped = map_rules_for_target(target, raw_rules)
         groups = split_rules(mapped)
 
         if base_groups.upgradable_domainset:
-            write_lines_with_header(output_path(target, bundle, "domain.list"), domainset_entries_for_target(target, groups.domain))
+            if write_lines_with_header(
+                output_path(target, bundle, "domain.list"),
+                domainset_entries_for_target(target, groups.domain),
+                generated_at,
+            ):
+                generated_files[target].append("domain.list")
         else:
             endpoint_rules = [*groups.domain, *groups.endpoint]
-            write_lines_with_header(output_path(target, bundle, "endpoint.conf"), [rule.as_line for rule in endpoint_rules])
-            write_lines_with_header(output_path(target, bundle, "ua.conf"), [rule.as_line for rule in groups.ua])
+            if write_lines_with_header(
+                output_path(target, bundle, "endpoint.conf"),
+                [rule.as_line for rule in endpoint_rules],
+                generated_at,
+            ):
+                generated_files[target].append("endpoint.conf")
+            if write_lines_with_header(
+                output_path(target, bundle, "ua.conf"),
+                [rule.as_line for rule in groups.ua],
+                generated_at,
+            ):
+                generated_files[target].append("ua.conf")
 
     mihomo_mapped = map_rules_for_target("mihomo", raw_rules)
     mihomo_groups = split_rules(mihomo_mapped)
     if base_groups.upgradable_domainset:
-        write_lines_with_header(output_path("mihomo", bundle, "domain.list"), domainset_entries_for_target("mihomo", mihomo_groups.domain))
+        if write_lines_with_header(
+            output_path("mihomo", bundle, "domain.list"),
+            domainset_entries_for_target("mihomo", mihomo_groups.domain),
+            generated_at,
+        ):
+            generated_files["mihomo"].append("domain.list")
     else:
         endpoint_rules = [*mihomo_groups.domain, *mihomo_groups.endpoint]
         if endpoint_rules:
             out = output_path("mihomo", bundle, "endpoint.yaml")
-            write_yaml_with_header(out, to_mihomo_payload(endpoint_rules), len(endpoint_rules))
+            write_yaml_with_header(out, to_mihomo_payload(endpoint_rules), len(endpoint_rules), generated_at)
+            generated_files["mihomo"].append("endpoint.yaml")
 
     sing_mapped = map_rules_for_target("sing-box", raw_rules)
     sing_groups = split_rules(sing_mapped)
@@ -292,16 +354,20 @@ def emit_one(bundle: Bundle, raw_rules: list[Rule], compile_srs: bool) -> None:
             json.dumps(to_sing_box_rules(sing_groups.domain), ensure_ascii=False, indent=2) + "\n",
             encoding="utf-8",
         )
+        generated_files["sing-box"].append("domain.json")
         if compile_srs:
             compile_sing_box(domain_json, output_path("sing-box", bundle, "domain.srs"))
+            generated_files["sing-box"].append("domain.srs")
     else:
         endpoint_rules = [*sing_groups.domain, *sing_groups.endpoint]
         if endpoint_rules:
             endpoint_json = output_path("sing-box", bundle, "endpoint.json")
             endpoint_json.parent.mkdir(parents=True, exist_ok=True)
             endpoint_json.write_text(json.dumps(to_sing_box_rules(endpoint_rules), ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            generated_files["sing-box"].append("endpoint.json")
             if compile_srs:
                 compile_sing_box(endpoint_json, output_path("sing-box", bundle, "endpoint.srs"))
+                generated_files["sing-box"].append("endpoint.srs")
 
     output_path("mihomo", bundle, "ua.conf").unlink(missing_ok=True)
     output_path("sing-box", bundle, "ua.conf").unlink(missing_ok=True)
@@ -314,6 +380,9 @@ def emit_one(bundle: Bundle, raw_rules: list[Rule], compile_srs: bool) -> None:
     output_path("surge", bundle, "other.conf").unlink(missing_ok=True)
     output_path("shadowrocket", bundle, "other.conf").unlink(missing_ok=True)
     output_path("loon", bundle, "other.conf").unlink(missing_ok=True)
+
+    for target in TARGETS:
+        write_bundle_readme(target, bundle, generated_files[target])
 
 
 def iter_sources() -> list[tuple[Bundle, list[Rule]]]:
@@ -363,9 +432,10 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
+    generated_at = datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
     entries = iter_sources()
     for bundle, rules in entries:
-        emit_one(bundle, rules, compile_srs=not args.skip_sing_box_compile)
+        emit_one(bundle, rules, compile_srs=not args.skip_sing_box_compile, generated_at=generated_at)
     write_manifest(entries)
     print(f"Generated {len(entries)} rule bundles.")
 
