@@ -1,0 +1,37 @@
+# sing-box/srs
+
+This directory is auto-generated.
+
+## External URLs
+
+### audited.srs
+
+- raw.githubusercontent.com: https://raw.githubusercontent.com/lapofgod/rulesets/generated/sing-box/srs/audited.srs
+- cdn.jsdelivr.net: https://cdn.jsdelivr.net/gh/lapofgod/rulesets@generated/sing-box/srs/audited.srs
+- fastly.jsdelivr.net: https://fastly.jsdelivr.net/gh/lapofgod/rulesets@generated/sing-box/srs/audited.srs
+- testingcf.jsdelivr.net: https://testingcf.jsdelivr.net/gh/lapofgod/rulesets@generated/sing-box/srs/audited.srs
+- gh-proxy: https://gh-proxy.org/https://github.com/lapofgod/rulesets/blob/generated/sing-box/srs/audited.srs
+
+### check_ip.srs
+
+- raw.githubusercontent.com: https://raw.githubusercontent.com/lapofgod/rulesets/generated/sing-box/srs/check_ip.srs
+- cdn.jsdelivr.net: https://cdn.jsdelivr.net/gh/lapofgod/rulesets@generated/sing-box/srs/check_ip.srs
+- fastly.jsdelivr.net: https://fastly.jsdelivr.net/gh/lapofgod/rulesets@generated/sing-box/srs/check_ip.srs
+- testingcf.jsdelivr.net: https://testingcf.jsdelivr.net/gh/lapofgod/rulesets@generated/sing-box/srs/check_ip.srs
+- gh-proxy: https://gh-proxy.org/https://github.com/lapofgod/rulesets/blob/generated/sing-box/srs/check_ip.srs
+
+### conn_check.srs
+
+- raw.githubusercontent.com: https://raw.githubusercontent.com/lapofgod/rulesets/generated/sing-box/srs/conn_check.srs
+- cdn.jsdelivr.net: https://cdn.jsdelivr.net/gh/lapofgod/rulesets@generated/sing-box/srs/conn_check.srs
+- fastly.jsdelivr.net: https://fastly.jsdelivr.net/gh/lapofgod/rulesets@generated/sing-box/srs/conn_check.srs
+- testingcf.jsdelivr.net: https://testingcf.jsdelivr.net/gh/lapofgod/rulesets@generated/sing-box/srs/conn_check.srs
+- gh-proxy: https://gh-proxy.org/https://github.com/lapofgod/rulesets/blob/generated/sing-box/srs/conn_check.srs
+
+### wikimedia.srs
+
+- raw.githubusercontent.com: https://raw.githubusercontent.com/lapofgod/rulesets/generated/sing-box/srs/wikimedia.srs
+- cdn.jsdelivr.net: https://cdn.jsdelivr.net/gh/lapofgod/rulesets@generated/sing-box/srs/wikimedia.srs
+- fastly.jsdelivr.net: https://fastly.jsdelivr.net/gh/lapofgod/rulesets@generated/sing-box/srs/wikimedia.srs
+- testingcf.jsdelivr.net: https://testingcf.jsdelivr.net/gh/lapofgod/rulesets@generated/sing-box/srs/wikimedia.srs
+- gh-proxy: https://gh-proxy.org/https://github.com/lapofgod/rulesets/blob/generated/sing-box/srs/wikimedia.srs
