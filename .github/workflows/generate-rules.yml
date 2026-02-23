@@ -3,7 +3,7 @@ name: Generate Rules
 on:
   push:
     paths:
-      - "sources/**"
+      - "src/**"
       - "scripts/**"
       - "pyproject.toml"
       - "uv.lock"

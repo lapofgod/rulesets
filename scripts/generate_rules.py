@@ -13,10 +13,10 @@ from typing import Iterable
 import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
-SOURCE_ROOT = ROOT / "sources"
+SOURCE_ROOT = ROOT / "src"
 OUTPUT_ROOT = ROOT / "generated"
 RULESET_BASELINE = "mihomo"
-GITHUB_REPO = "lapofgod/ruleset"
+GITHUB_REPO = "lapofgod/rulesets"
 PUBLISH_BRANCH = "generated"
 TARGETS = ["surge", "mihomo", "shadowrocket", "loon", "sing-box"]
 
@@ -194,18 +194,18 @@ def split_rules(rules: list[Rule]) -> RuleGroups:
     return RuleGroups(domain=domain, endpoint=endpoint, ua=ua, upgradable_domainset=upgradable_domainset)
 
 
-def output_path(target: str, bundle: Bundle, filename: str) -> Path:
-    return OUTPUT_ROOT / target / bundle.name / filename
+def output_path(target: str, rule_type: str, filename: str) -> Path:
+    return OUTPUT_ROOT / target / rule_type / filename
 
 
-def write_bundle_readme(target: str, bundle: Bundle, filenames: list[str]) -> None:
+def write_type_readme(target: str, rule_type: str, filenames: list[str]) -> None:
     if not filenames:
         return
 
     sorted_files = sorted(set(filenames))
-    base_path = f"{target}/{bundle.name}"
+    base_path = f"{target}/{rule_type}"
     lines: list[str] = [
-        f"# {target}/{bundle.name}",
+        f"# {target}/{rule_type}",
         "",
         "This directory is auto-generated.",
         "",
@@ -216,8 +216,9 @@ def write_bundle_readme(target: str, bundle: Bundle, filenames: list[str]) -> No
         for filename in sorted_files:
             rel_path = f"{base_path}/{filename}"
             raw_url = f"https://raw.githubusercontent.com/{GITHUB_REPO}/{PUBLISH_BRANCH}/{rel_path}"
+            provider_name = Path(filename).stem
 
-            if filename == "domain.list":
+            if rule_type == "domains" and filename.endswith(".list"):
                 lines.extend(
                     [
                         f"### {filename}",
@@ -225,18 +226,18 @@ def write_bundle_readme(target: str, bundle: Bundle, filenames: list[str]) -> No
                         "- Behavior: domain",
                         "```yaml",
                         "rule-providers:",
-                        f"  {bundle.name}_domain:",
+                        f"  {provider_name}_domains:",
                         "    type: http",
                         "    behavior: domain",
                         "    format: text",
                         f"    url: {raw_url}",
-                        f"    path: ./ruleset/{bundle.name}_domain.list",
+                        f"    path: ./ruleset/{provider_name}.list",
                         "    interval: 86400",
                         "```",
                         "",
                     ]
                 )
-            elif filename == "endpoint.yaml":
+            elif rule_type == "endpoints" and filename.endswith(".yaml"):
                 lines.extend(
                     [
                         f"### {filename}",
@@ -244,12 +245,12 @@ def write_bundle_readme(target: str, bundle: Bundle, filenames: list[str]) -> No
                         "- Behavior: classical",
                         "```yaml",
                         "rule-providers:",
-                        f"  {bundle.name}_endpoint:",
+                        f"  {provider_name}_endpoints:",
                         "    type: http",
                         "    behavior: classical",
                         "    format: yaml",
                         f"    url: {raw_url}",
-                        f"    path: ./ruleset/{bundle.name}_endpoint.yaml",
+                        f"    path: ./ruleset/{provider_name}.yaml",
                         "    interval: 86400",
                         "```",
                         "",
@@ -273,7 +274,7 @@ def write_bundle_readme(target: str, bundle: Bundle, filenames: list[str]) -> No
             ]
         )
 
-    readme_path = output_path(target, bundle, "README.MD")
+    readme_path = output_path(target, rule_type, "README.MD")
     readme_path.parent.mkdir(parents=True, exist_ok=True)
     readme_path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
 
@@ -344,78 +345,66 @@ def compile_sing_box(source_json: Path, out_srs: Path) -> None:
     subprocess.run([binary, "rule-set", "compile", "--output", str(out_srs), str(source_json)], check=True)
 
 
-def emit_one(bundle: Bundle, raw_rules: list[Rule], compile_srs: bool, generated_at: str) -> None:
-    generated_files: dict[str, list[str]] = {target: [] for target in TARGETS}
+def emit_one(bundle: Bundle, raw_rules: list[Rule], compile_srs: bool, generated_at: str) -> dict[str, dict[str, list[str]]]:
+    generated_files: dict[str, dict[str, list[str]]] = {target: {} for target in TARGETS}
+
+    def remember(target: str, rule_type: str, filename: str) -> None:
+        if rule_type not in generated_files[target]:
+            generated_files[target][rule_type] = []
+        generated_files[target][rule_type].append(filename)
 
     for target in ["surge", "shadowrocket", "loon"]:
         mapped = map_rules_for_target(target, raw_rules)
         groups = split_rules(mapped)
 
         if write_lines_with_header(
-            output_path(target, bundle, "domain.list"),
+            output_path(target, "domains", f"{bundle.name}.list"),
             domainset_entries_for_target(target, groups.domain),
             generated_at,
         ):
-            generated_files[target].append("domain.list")
+            remember(target, "domains", f"{bundle.name}.list")
         if write_lines_with_header(
-            output_path(target, bundle, "endpoint.conf"),
+            output_path(target, "endpoints", f"{bundle.name}.conf"),
             [rule.as_line for rule in groups.endpoint],
             generated_at,
         ):
-            generated_files[target].append("endpoint.conf")
+            remember(target, "endpoints", f"{bundle.name}.conf")
         if write_lines_with_header(
-            output_path(target, bundle, "ua.conf"),
+            output_path(target, "origins", f"{bundle.name}.conf"),
             [rule.as_line for rule in groups.ua],
             generated_at,
         ):
-            generated_files[target].append("ua.conf")
+            remember(target, "origins", f"{bundle.name}.conf")
 
     mihomo_mapped = map_rules_for_target("mihomo", raw_rules)
     mihomo_groups = split_rules(mihomo_mapped)
     if write_lines_with_header(
-        output_path("mihomo", bundle, "domain.list"),
+        output_path("mihomo", "domains", f"{bundle.name}.list"),
         domainset_entries_for_target("mihomo", mihomo_groups.domain),
         generated_at,
     ):
-        generated_files["mihomo"].append("domain.list")
+        remember("mihomo", "domains", f"{bundle.name}.list")
     if mihomo_groups.endpoint:
-        out = output_path("mihomo", bundle, "endpoint.yaml")
+        out = output_path("mihomo", "endpoints", f"{bundle.name}.yaml")
         write_yaml_with_header(out, to_mihomo_payload(mihomo_groups.endpoint), len(mihomo_groups.endpoint), generated_at)
-        generated_files["mihomo"].append("endpoint.yaml")
+        remember("mihomo", "endpoints", f"{bundle.name}.yaml")
 
     sing_mapped = map_rules_for_target("sing-box", raw_rules)
     sing_groups = split_rules(sing_mapped)
     sing_rules = [*sing_groups.domain, *sing_groups.endpoint]
     if sing_rules:
-        rules_json = output_path("sing-box", bundle, "rules.json")
+        rules_json = output_path("sing-box", "json", f"{bundle.name}.json")
         rules_json.parent.mkdir(parents=True, exist_ok=True)
         rules_json.write_text(
             json.dumps(to_sing_box_rules(sing_rules), ensure_ascii=False, indent=2) + "\n",
             encoding="utf-8",
         )
-        generated_files["sing-box"].append("rules.json")
+        remember("sing-box", "json", f"{bundle.name}.json")
         if compile_srs:
-            compile_sing_box(rules_json, output_path("sing-box", bundle, "rules.srs"))
-            generated_files["sing-box"].append("rules.srs")
+            compile_sing_box(rules_json, output_path("sing-box", "srs", f"{bundle.name}.srs"))
+            remember("sing-box", "srs", f"{bundle.name}.srs")
 
-    output_path("mihomo", bundle, "ua.conf").unlink(missing_ok=True)
-    output_path("sing-box", bundle, "ua.conf").unlink(missing_ok=True)
-    output_path("sing-box", bundle, "ua.unsupported.list").unlink(missing_ok=True)
-    output_path("sing-box", bundle, "domain.list").unlink(missing_ok=True)
-    output_path("sing-box", bundle, "domain.json").unlink(missing_ok=True)
-    output_path("sing-box", bundle, "domain.srs").unlink(missing_ok=True)
-    output_path("sing-box", bundle, "endpoint.json").unlink(missing_ok=True)
-    output_path("sing-box", bundle, "endpoint.srs").unlink(missing_ok=True)
-    output_path("sing-box", bundle, "other.source.json").unlink(missing_ok=True)
-    output_path("sing-box", bundle, "other.json").unlink(missing_ok=True)
-    output_path("sing-box", bundle, "other.srs").unlink(missing_ok=True)
-    output_path("mihomo", bundle, "other.yaml").unlink(missing_ok=True)
-    output_path("surge", bundle, "other.conf").unlink(missing_ok=True)
-    output_path("shadowrocket", bundle, "other.conf").unlink(missing_ok=True)
-    output_path("loon", bundle, "other.conf").unlink(missing_ok=True)
-
-    for target in TARGETS:
-        write_bundle_readme(target, bundle, generated_files[target])
+    return generated_files
 
 
 def iter_sources() -> list[tuple[Bundle, list[Rule]]]:
@@ -430,7 +419,7 @@ def iter_sources() -> list[tuple[Bundle, list[Rule]]]:
 
 def write_manifest(entries: list[tuple[Bundle, list[Rule]]]) -> None:
     manifest = {
-        "single_source_of_truth": "sources/*.conf (non-hidden)",
+        "single_source_of_truth": "src/*.conf (non-hidden)",
         "ruleset_baseline": RULESET_BASELINE,
         "sources": [
             {
@@ -454,7 +443,7 @@ def write_manifest(entries: list[tuple[Bundle, list[Rule]]]) -> None:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Generate multi-client rules from sources/*.conf")
+    parser = argparse.ArgumentParser(description="Generate multi-client rules from src/*.conf")
     parser.add_argument(
         "--skip-sing-box-compile",
         action="store_true",
@@ -469,8 +458,19 @@ def main() -> None:
     if OUTPUT_ROOT.exists():
         shutil.rmtree(OUTPUT_ROOT)
     entries = iter_sources()
+    readme_index: dict[str, dict[str, list[str]]] = {target: {} for target in TARGETS}
     for bundle, rules in entries:
-        emit_one(bundle, rules, compile_srs=not args.skip_sing_box_compile, generated_at=generated_at)
+        file_map = emit_one(bundle, rules, compile_srs=not args.skip_sing_box_compile, generated_at=generated_at)
+        for target, types in file_map.items():
+            for rule_type, filenames in types.items():
+                if rule_type not in readme_index[target]:
+                    readme_index[target][rule_type] = []
+                readme_index[target][rule_type].extend(filenames)
+
+    for target, types in readme_index.items():
+        for rule_type, filenames in types.items():
+            write_type_readme(target, rule_type, filenames)
+
     write_manifest(entries)
     print(f"Generated {len(entries)} rule bundles.")
 
