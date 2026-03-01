@@ -15,9 +15,9 @@
     {
       "name": "check_ip",
       "source": "src/check_ip.conf",
-      "rule_count": 18,
+      "rule_count": 19,
       "group_count": {
-        "domain": 18,
+        "domain": 19,
         "endpoint": 0,
         "origins": 0
       }
