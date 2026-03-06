@@ -70,12 +70,18 @@ URL-REGEX,^https?:\/\/example\.com\/api
 USER-AGENT,Curl*
 ```
 
+支持行尾注释，例如：`DOMAIN-SUFFIX,example.com # note`。
+
 ## 自动升级规则类型
 
 - 原始规则中可表示为 domain set 的部分会拆分到 `domains`。
 - `USER-AGENT` 与 `SRC-PORT` 这类约束请求者来源的规则会拆分到 `origins`。
 - 其余规则才进入 `endpoints`。
 - sing-box 不做这种拆分，仍统一输出到 `json/<服务>.json`。
+
+其中 `DOMAIN-WILDCARD` / `DOMAIN-REGEX` / `DOMAIN-KEYWORD` 均已支持：
+- 在非 sing-box 平台主要落到 `endpoints`（或保留平台可兼容映射）。
+- 在 sing-box 中映射到 `domain_regex` / `domain_keyword` 等对应字段。
 
 `domains.list` 文件名保持不变，但内容是平台对应的 domain set 语义：
 - mihomo: `+.example.com`

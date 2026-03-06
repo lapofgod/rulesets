@@ -26,7 +26,7 @@ TARGETS = ["surge", "mihomo", "shadowrocket", "loon", "sing-box"]
 GFWLIST_NAME = "gfwlist"
 GFWLIST_URL = "https://raw.githubusercontent.com/gfwlist/gfwlist/master/gfwlist.txt"
 
-DOMAIN_KINDS = {"DOMAIN", "DOMAIN-SUFFIX", "DOMAIN-KEYWORD", "DOMAIN-WILDCARD"}
+DOMAINSET_KINDS = {"DOMAIN", "DOMAIN-SUFFIX"}
 ORIGIN_KINDS = {"USER-AGENT", "SRC-PORT"}
 
 
@@ -69,6 +69,8 @@ def normalize_kind(kind: str) -> str:
 
 def parse_conf_line(raw: str) -> Rule | None:
     line = raw.strip()
+    # Support inline comments in .conf, e.g. `RULE,... # note`
+    line = re.split(r"\s+#", line, maxsplit=1)[0].strip()
     if not line or line.startswith("#"):
         return None
 
@@ -246,7 +248,7 @@ def map_rule_for_target(target: str, rule: Rule) -> Rule | None:
         if target == "sing-box":
             if value.startswith("*."):
                 return Rule("DOMAIN-SUFFIX", value[2:], extras)
-            return None
+            return Rule("DOMAIN-WILDCARD", value, extras)
 
     if kind == "USER-AGENT" and target in {"mihomo", "sing-box"}:
         return None
@@ -272,7 +274,7 @@ def split_rules(rules: list[Rule]) -> RuleGroups:
     origins: list[Rule] = []
 
     for rule in rules:
-        if rule.kind in DOMAIN_KINDS:
+        if rule.kind in DOMAINSET_KINDS:
             domain.append(rule)
         elif rule.kind in ORIGIN_KINDS:
             origins.append(rule)
@@ -420,11 +422,15 @@ def domainset_entries_for_target(target: str, rules: list[Rule]) -> list[str]:
 
 
 def to_mihomo_payload(rules: list[Rule]) -> dict:
-    return {"payload": [rule.as_line for rule in rules], "metadata": {"ruleset_baseline": RULESET_BASELINE}}
+    return {"payload": [rule.as_line for rule in rules]}
 
 
 def to_sing_box_rules(rules: list[Rule]) -> dict:
     mapped: list[dict] = []
+
+    def wildcard_to_regex(pattern: str) -> str:
+        escaped = re.escape(pattern)
+        return "^" + escaped.replace(r"\*", ".*") + "$"
 
     def append_rule(key: str, value: str) -> None:
         if mapped and key in mapped[-1]:
@@ -439,6 +445,10 @@ def to_sing_box_rules(rules: list[Rule]) -> dict:
             append_rule("domain_suffix", rule.value)
         elif rule.kind == "DOMAIN-KEYWORD":
             append_rule("domain_keyword", rule.value)
+        elif rule.kind == "DOMAIN-REGEX":
+            append_rule("domain_regex", rule.value)
+        elif rule.kind == "DOMAIN-WILDCARD":
+            append_rule("domain_regex", wildcard_to_regex(rule.value))
         elif rule.kind in {"IP-CIDR", "IP-CIDR6"}:
             append_rule("ip_cidr", rule.value)
         elif rule.kind == "URL-REGEX":
