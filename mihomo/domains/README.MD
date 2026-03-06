@@ -48,6 +48,20 @@ rule-providers:
     interval: 86400
 ```
 
+### gfwlist.list
+- Format: text
+- Behavior: domain
+```yaml
+rule-providers:
+  gfwlist_domains:
+    type: http
+    behavior: domain
+    format: text
+    url: https://raw.githubusercontent.com/lapofgod/rulesets/generated/mihomo/domains/gfwlist.list
+    path: ./ruleset/gfwlist.list
+    interval: 86400
+```
+
 ### wikimedia.list
 - Format: text
 - Behavior: domain
@@ -87,6 +101,14 @@ rule-providers:
 - fastly.jsdelivr.net: https://fastly.jsdelivr.net/gh/lapofgod/rulesets@generated/mihomo/domains/conn_check.list
 - testingcf.jsdelivr.net: https://testingcf.jsdelivr.net/gh/lapofgod/rulesets@generated/mihomo/domains/conn_check.list
 - gh-proxy: https://gh-proxy.org/https://github.com/lapofgod/rulesets/blob/generated/mihomo/domains/conn_check.list
+
+### gfwlist.list
+
+- raw.githubusercontent.com: https://raw.githubusercontent.com/lapofgod/rulesets/generated/mihomo/domains/gfwlist.list
+- cdn.jsdelivr.net: https://cdn.jsdelivr.net/gh/lapofgod/rulesets@generated/mihomo/domains/gfwlist.list
+- fastly.jsdelivr.net: https://fastly.jsdelivr.net/gh/lapofgod/rulesets@generated/mihomo/domains/gfwlist.list
+- testingcf.jsdelivr.net: https://testingcf.jsdelivr.net/gh/lapofgod/rulesets@generated/mihomo/domains/gfwlist.list
+- gh-proxy: https://gh-proxy.org/https://github.com/lapofgod/rulesets/blob/generated/mihomo/domains/gfwlist.list
 
 ### wikimedia.list
 

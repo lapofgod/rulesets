@@ -41,6 +41,16 @@
         "endpoint": 0,
         "origins": 0
       }
+    },
+    {
+      "name": "gfwlist",
+      "source": "upstream:https://raw.githubusercontent.com/gfwlist/gfwlist/master/gfwlist.txt",
+      "rule_count": 4132,
+      "group_count": {
+        "domain": 4132,
+        "endpoint": 0,
+        "origins": 0
+      }
     }
   ],
   "targets": [
@@ -49,5 +59,6 @@
     "shadowrocket",
     "loon",
     "sing-box"
-  ]
+  ],
+  "failures": []
 }
