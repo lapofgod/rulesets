@@ -53,6 +53,12 @@ surge/endpoints/README.MD
 `src/` 下所有不以 `.` 开头的 `.conf` 文件都会被自动检索并生成，规则名取文件名（去掉 `.conf`）。
 以 `#` 开头的行会被视为注释并忽略。
 
+此外会自动从上游拉取 `gfwlist`（`gfwlist/gfwlist`），作为固定项目名 `gfwlist` 一起生成。
+
+若某个项目（包括 `gfwlist`）生成失败：
+- 只会记录该项目失败，不会中断其他项目生成。
+- 发布到 `generated` 分支时会沿用该项目上一次已存在的文件版本。
+
 每行规则采用：**Mihomo 语法 + URL-REGEX + USER-AGENT**，例如：
 
 ```text

@@ -2,9 +2,13 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import json
+import re
 import shutil
 import subprocess
+import urllib.parse
+import urllib.request
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -19,6 +23,8 @@ RULESET_BASELINE = "mihomo"
 GITHUB_REPO = "lapofgod/rulesets"
 PUBLISH_BRANCH = "generated"
 TARGETS = ["surge", "mihomo", "shadowrocket", "loon", "sing-box"]
+GFWLIST_NAME = "gfwlist"
+GFWLIST_URL = "https://raw.githubusercontent.com/gfwlist/gfwlist/master/gfwlist.txt"
 
 DOMAIN_KINDS = {"DOMAIN", "DOMAIN-SUFFIX", "DOMAIN-KEYWORD", "DOMAIN-WILDCARD"}
 ORIGIN_KINDS = {"USER-AGENT", "SRC-PORT"}
@@ -39,6 +45,12 @@ class Rule:
 class Bundle:
     name: str
     source: Path
+
+
+@dataclass(frozen=True)
+class GenerationFailure:
+    name: str
+    reason: str
 
 
 @dataclass(frozen=True)
@@ -85,6 +97,95 @@ def parse_file(file_path: Path) -> list[Rule]:
         parsed = parse_conf_line(line)
         if parsed:
             rules.append(parsed)
+    return rules
+
+
+def fetch_gfwlist_raw() -> str:
+    req = urllib.request.Request(
+        GFWLIST_URL,
+        headers={"User-Agent": "rulesets-generator/1.0"},
+    )
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        data = resp.read()
+
+    text = data.decode("utf-8", errors="ignore").strip()
+    try:
+        decoded = base64.b64decode(text, validate=False).decode("utf-8", errors="ignore")
+        if "[AutoProxy" in decoded or "||" in decoded:
+            return decoded
+    except Exception:
+        pass
+
+    return text
+
+
+def normalize_domain_from_host(host: str) -> str | None:
+    host = host.strip().lower().strip(".")
+    if not host:
+        return None
+    if host.startswith("*"):
+        host = host.lstrip("*").lstrip(".")
+    if host.startswith("[") and host.endswith("]"):
+        return None
+    if re.fullmatch(r"\d+\.\d+\.\d+\.\d+", host):
+        return None
+    if "." not in host:
+        return None
+    if any(ch not in "abcdefghijklmnopqrstuvwxyz0123456789.-" for ch in host):
+        return None
+    return host
+
+
+def parse_gfwlist_line(line: str) -> Rule | None:
+    line = line.strip()
+    if not line:
+        return None
+    if line.startswith("!") or line.startswith("["):
+        return None
+    if line.startswith("@@"):
+        return None
+
+    # Strip adblock options.
+    if "$" in line:
+        line = line.split("$", 1)[0]
+
+    if line.startswith("||"):
+        dom = normalize_domain_from_host(line[2:])
+        return Rule("DOMAIN-SUFFIX", dom) if dom else None
+
+    if line.startswith("|"):
+        line = line[1:]
+
+    if line.startswith("http://") or line.startswith("https://"):
+        try:
+            host = urllib.parse.urlparse(line).hostname
+            dom = normalize_domain_from_host(host or "")
+            return Rule("DOMAIN-SUFFIX", dom) if dom else None
+        except Exception:
+            return None
+
+    if line.startswith("."):
+        dom = normalize_domain_from_host(line[1:])
+        return Rule("DOMAIN-SUFFIX", dom) if dom else None
+
+    if line.startswith("*."):
+        dom = normalize_domain_from_host(line[2:])
+        return Rule("DOMAIN-SUFFIX", dom) if dom else None
+
+    if any(token in line for token in ["*", "^", "/", "?"]):
+        return None
+
+    dom = normalize_domain_from_host(line)
+    return Rule("DOMAIN-SUFFIX", dom) if dom else None
+
+
+def fetch_gfwlist_rules() -> list[Rule]:
+    raw = fetch_gfwlist_raw()
+    rules: list[Rule] = []
+    for line in raw.splitlines():
+        rule = parse_gfwlist_line(line)
+        if rule:
+            rules.append(rule)
     return rules
 
 
@@ -423,24 +524,41 @@ def emit_one(bundle: Bundle, raw_rules: list[Rule], compile_srs: bool, generated
     return generated_files
 
 
-def iter_sources() -> list[tuple[Bundle, list[Rule]]]:
-    entries: list[tuple[Bundle, list[Rule]]] = []
+def iter_sources() -> list[Bundle]:
+    entries: list[Bundle] = []
     for source in sorted(SOURCE_ROOT.glob("*.conf")):
         if source.name.startswith("."):
             continue
         bundle = Bundle(name=source.stem, source=source)
-        entries.append((bundle, parse_file(source)))
+        entries.append(bundle)
+
+    gfw_bundle = Bundle(name=GFWLIST_NAME, source=Path(f"upstream:{GFWLIST_URL}"))
+    entries.append(gfw_bundle)
     return entries
 
 
-def write_manifest(entries: list[tuple[Bundle, list[Rule]]]) -> None:
+def load_rules(bundle: Bundle) -> list[Rule]:
+    source_str = str(bundle.source)
+    if source_str.startswith("upstream:"):
+        return fetch_gfwlist_rules()
+    return parse_file(bundle.source)
+
+
+def write_manifest(entries: list[tuple[Bundle, list[Rule]]], failures: list[GenerationFailure]) -> None:
+    def source_ref(source: Path) -> str:
+        try:
+            return str(source.relative_to(ROOT))
+        except ValueError:
+            raw = str(source)
+            return raw.replace("https:/", "https://", 1).replace("http:/", "http://", 1)
+
     manifest = {
         "single_source_of_truth": "src/*.conf (non-hidden)",
         "ruleset_baseline": RULESET_BASELINE,
         "sources": [
             {
                 "name": bundle.name,
-                "source": str(bundle.source.relative_to(ROOT)),
+                "source": source_ref(bundle.source),
                 "rule_count": len(rules),
                 "group_count": {
                     "domain": len(split_rules(rules).domain),
@@ -451,6 +569,7 @@ def write_manifest(entries: list[tuple[Bundle, list[Rule]]]) -> None:
             for bundle, rules in entries
         ],
         "targets": TARGETS,
+        "failures": [{"name": item.name, "reason": item.reason} for item in failures],
     }
     out = OUTPUT_ROOT / "manifest.json"
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -472,21 +591,29 @@ def main() -> None:
     generated_at = datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
     if OUTPUT_ROOT.exists():
         shutil.rmtree(OUTPUT_ROOT)
-    entries = iter_sources()
+    bundles = iter_sources()
+    entries: list[tuple[Bundle, list[Rule]]] = []
+    failures: list[GenerationFailure] = []
     readme_index: dict[str, dict[str, list[str]]] = {target: {} for target in TARGETS}
-    for bundle, rules in entries:
-        file_map = emit_one(bundle, rules, compile_srs=not args.skip_sing_box_compile, generated_at=generated_at)
-        for target, types in file_map.items():
-            for rule_type, filenames in types.items():
-                if rule_type not in readme_index[target]:
-                    readme_index[target][rule_type] = []
-                readme_index[target][rule_type].extend(filenames)
+    for bundle in bundles:
+        try:
+            rules = load_rules(bundle)
+            file_map = emit_one(bundle, rules, compile_srs=not args.skip_sing_box_compile, generated_at=generated_at)
+            entries.append((bundle, rules))
+            for target, types in file_map.items():
+                for rule_type, filenames in types.items():
+                    if rule_type not in readme_index[target]:
+                        readme_index[target][rule_type] = []
+                    readme_index[target][rule_type].extend(filenames)
+        except Exception as exc:
+            failures.append(GenerationFailure(name=bundle.name, reason=str(exc)))
+            print(f"[WARN] Failed to generate '{bundle.name}': {exc}. Keep previous published version.")
 
     for target, types in readme_index.items():
         for rule_type, filenames in types.items():
             write_type_readme(target, rule_type, filenames)
 
-    write_manifest(entries)
+    write_manifest(entries, failures)
     print(f"Generated {len(entries)} rule bundles.")
 
 
