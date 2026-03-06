@@ -6,6 +6,20 @@ This directory is auto-generated.
 
 Use `domains` + `endpoints` + `origins` in parallel when available.
 
+### _personal_reject.list
+- Format: text
+- Behavior: domain
+```yaml
+rule-providers:
+  _personal_reject_domains:
+    type: http
+    behavior: domain
+    format: text
+    url: https://raw.githubusercontent.com/lapofgod/rulesets/generated/mihomo/domains/_personal_reject.list
+    path: ./ruleset/_personal_reject.list
+    interval: 86400
+```
+
 ### audited.list
 - Format: text
 - Behavior: domain
@@ -77,6 +91,14 @@ rule-providers:
 ```
 
 ## External URLs
+
+### _personal_reject.list
+
+- raw.githubusercontent.com: https://raw.githubusercontent.com/lapofgod/rulesets/generated/mihomo/domains/_personal_reject.list
+- cdn.jsdelivr.net: https://cdn.jsdelivr.net/gh/lapofgod/rulesets@generated/mihomo/domains/_personal_reject.list
+- fastly.jsdelivr.net: https://fastly.jsdelivr.net/gh/lapofgod/rulesets@generated/mihomo/domains/_personal_reject.list
+- testingcf.jsdelivr.net: https://testingcf.jsdelivr.net/gh/lapofgod/rulesets@generated/mihomo/domains/_personal_reject.list
+- gh-proxy: https://gh-proxy.org/https://github.com/lapofgod/rulesets/blob/generated/mihomo/domains/_personal_reject.list
 
 ### audited.list
 

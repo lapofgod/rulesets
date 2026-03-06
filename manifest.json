@@ -3,6 +3,16 @@
   "ruleset_baseline": "mihomo",
   "sources": [
     {
+      "name": "_personal_reject",
+      "source": "src/_personal_reject.conf",
+      "rule_count": 3,
+      "group_count": {
+        "domain": 1,
+        "endpoint": 2,
+        "origins": 0
+      }
+    },
+    {
       "name": "audited",
       "source": "src/audited.conf",
       "rule_count": 76,

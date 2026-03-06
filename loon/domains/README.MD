@@ -4,6 +4,14 @@ This directory is auto-generated.
 
 ## External URLs
 
+### _personal_reject.list
+
+- raw.githubusercontent.com: https://raw.githubusercontent.com/lapofgod/rulesets/generated/loon/domains/_personal_reject.list
+- cdn.jsdelivr.net: https://cdn.jsdelivr.net/gh/lapofgod/rulesets@generated/loon/domains/_personal_reject.list
+- fastly.jsdelivr.net: https://fastly.jsdelivr.net/gh/lapofgod/rulesets@generated/loon/domains/_personal_reject.list
+- testingcf.jsdelivr.net: https://testingcf.jsdelivr.net/gh/lapofgod/rulesets@generated/loon/domains/_personal_reject.list
+- gh-proxy: https://gh-proxy.org/https://github.com/lapofgod/rulesets/blob/generated/loon/domains/_personal_reject.list
+
 ### audited.list
 
 - raw.githubusercontent.com: https://raw.githubusercontent.com/lapofgod/rulesets/generated/loon/domains/audited.list
