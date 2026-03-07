@@ -1,12 +1,15 @@
 # Auto-generated file. Do not edit manually.
-# Rule count: 19
-# Generated at: 2026-03-07T04:07:47.870Z
+# Rule count: 25
+# Generated at: 2026-03-07T06:06:52.674Z
 
 .123169.xyz
 .api.myip.la
 .browserleaks.com
+.checkip.amazonaws.com
 .dnsleaktest.com
+.httpbin.org
 .icanhazip.com
+.ident.me
 .ifconfig.co
 .ifconfig.me
 .ip-api.com
@@ -15,9 +18,12 @@
 .ip.sb
 .ip.skk.moe
 .ip125.com
+.ipify.org
 .ipinfo.io
 .ipleak.net
 .ippure.com
 .myip.la
 .ping0.cc
+.test-ipv6.com
+.whatismyipaddress.com
 .whoer.net

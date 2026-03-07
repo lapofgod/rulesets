@@ -21,7 +21,14 @@
         "whoer.net",
         "ipleak.net",
         "browserleaks.com",
-        "dnsleaktest.com"
+        "dnsleaktest.com",
+        "checkip.amazonaws.com",
+        "ipify.org",
+        "httpbin.org",
+        "whatismyipaddress.com",
+        "ident.me",
+        "test-ipv6.com",
+        "icanhazip.com"
       ]
     }
   ]
