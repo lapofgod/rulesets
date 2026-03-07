@@ -44,6 +44,14 @@ This directory is auto-generated.
 - testingcf.jsdelivr.net: https://testingcf.jsdelivr.net/gh/lapofgod/rulesets@generated/sing-box/json/gfwlist.json
 - gh-proxy: https://gh-proxy.org/https://github.com/lapofgod/rulesets/blob/generated/sing-box/json/gfwlist.json
 
+### microsoft_proxy.json
+
+- raw.githubusercontent.com: https://raw.githubusercontent.com/lapofgod/rulesets/generated/sing-box/json/microsoft_proxy.json
+- cdn.jsdelivr.net: https://cdn.jsdelivr.net/gh/lapofgod/rulesets@generated/sing-box/json/microsoft_proxy.json
+- fastly.jsdelivr.net: https://fastly.jsdelivr.net/gh/lapofgod/rulesets@generated/sing-box/json/microsoft_proxy.json
+- testingcf.jsdelivr.net: https://testingcf.jsdelivr.net/gh/lapofgod/rulesets@generated/sing-box/json/microsoft_proxy.json
+- gh-proxy: https://gh-proxy.org/https://github.com/lapofgod/rulesets/blob/generated/sing-box/json/microsoft_proxy.json
+
 ### wikimedia.json
 
 - raw.githubusercontent.com: https://raw.githubusercontent.com/lapofgod/rulesets/generated/sing-box/json/wikimedia.json

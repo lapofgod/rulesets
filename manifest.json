@@ -43,6 +43,16 @@
       }
     },
     {
+      "name": "microsoft_proxy",
+      "source": "src/microsoft_proxy.conf",
+      "rule_count": 3,
+      "group_count": {
+        "domain": 3,
+        "endpoint": 0,
+        "origins": 0
+      }
+    },
+    {
       "name": "wikimedia",
       "source": "src/wikimedia.conf",
       "rule_count": 22,

@@ -76,6 +76,20 @@ rule-providers:
     interval: 86400
 ```
 
+### microsoft_proxy.list
+- Format: text
+- Behavior: domain
+```yaml
+rule-providers:
+  microsoft_proxy_domains:
+    type: http
+    behavior: domain
+    format: text
+    url: https://raw.githubusercontent.com/lapofgod/rulesets/generated/mihomo/domains/microsoft_proxy.list
+    path: ./ruleset/microsoft_proxy.list
+    interval: 86400
+```
+
 ### wikimedia.list
 - Format: text
 - Behavior: domain
@@ -131,6 +145,14 @@ rule-providers:
 - fastly.jsdelivr.net: https://fastly.jsdelivr.net/gh/lapofgod/rulesets@generated/mihomo/domains/gfwlist.list
 - testingcf.jsdelivr.net: https://testingcf.jsdelivr.net/gh/lapofgod/rulesets@generated/mihomo/domains/gfwlist.list
 - gh-proxy: https://gh-proxy.org/https://github.com/lapofgod/rulesets/blob/generated/mihomo/domains/gfwlist.list
+
+### microsoft_proxy.list
+
+- raw.githubusercontent.com: https://raw.githubusercontent.com/lapofgod/rulesets/generated/mihomo/domains/microsoft_proxy.list
+- cdn.jsdelivr.net: https://cdn.jsdelivr.net/gh/lapofgod/rulesets@generated/mihomo/domains/microsoft_proxy.list
+- fastly.jsdelivr.net: https://fastly.jsdelivr.net/gh/lapofgod/rulesets@generated/mihomo/domains/microsoft_proxy.list
+- testingcf.jsdelivr.net: https://testingcf.jsdelivr.net/gh/lapofgod/rulesets@generated/mihomo/domains/microsoft_proxy.list
+- gh-proxy: https://gh-proxy.org/https://github.com/lapofgod/rulesets/blob/generated/mihomo/domains/microsoft_proxy.list
 
 ### wikimedia.list
 

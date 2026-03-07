@@ -44,6 +44,14 @@ This directory is auto-generated.
 - testingcf.jsdelivr.net: https://testingcf.jsdelivr.net/gh/lapofgod/rulesets@generated/shadowrocket/domains/gfwlist.list
 - gh-proxy: https://gh-proxy.org/https://github.com/lapofgod/rulesets/blob/generated/shadowrocket/domains/gfwlist.list
 
+### microsoft_proxy.list
+
+- raw.githubusercontent.com: https://raw.githubusercontent.com/lapofgod/rulesets/generated/shadowrocket/domains/microsoft_proxy.list
+- cdn.jsdelivr.net: https://cdn.jsdelivr.net/gh/lapofgod/rulesets@generated/shadowrocket/domains/microsoft_proxy.list
+- fastly.jsdelivr.net: https://fastly.jsdelivr.net/gh/lapofgod/rulesets@generated/shadowrocket/domains/microsoft_proxy.list
+- testingcf.jsdelivr.net: https://testingcf.jsdelivr.net/gh/lapofgod/rulesets@generated/shadowrocket/domains/microsoft_proxy.list
+- gh-proxy: https://gh-proxy.org/https://github.com/lapofgod/rulesets/blob/generated/shadowrocket/domains/microsoft_proxy.list
+
 ### wikimedia.list
 
 - raw.githubusercontent.com: https://raw.githubusercontent.com/lapofgod/rulesets/generated/shadowrocket/domains/wikimedia.list
