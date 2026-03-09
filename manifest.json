@@ -65,9 +65,9 @@
     {
       "name": "gfwlist",
       "source": "upstream:https://raw.githubusercontent.com/gfwlist/gfwlist/master/gfwlist.txt",
-      "rule_count": 4132,
+      "rule_count": 4133,
       "group_count": {
-        "domain": 4132,
+        "domain": 4133,
         "endpoint": 0,
         "origins": 0
       }
