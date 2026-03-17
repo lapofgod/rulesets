@@ -73,6 +73,17 @@ jobs:
             cp -a "$entry" ./
           done
 
+          # Keep generated branch clean from Python cache artifacts.
+          cat > .gitignore <<'EOF'
+          __pycache__/
+          *.pyc
+          *.pyo
+          EOF
+
+          # Remove accidentally tracked cache files from previous runs.
+          git rm -r --cached --ignore-unmatch src/__pycache__ || true
+          find . -type d -name "__pycache__" -prune -exec rm -rf {} +
+
           git add -A .
 
           if git diff --staged --quiet; then
