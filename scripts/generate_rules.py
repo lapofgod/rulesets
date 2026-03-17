@@ -25,6 +25,8 @@ PUBLISH_BRANCH = "generated"
 TARGETS = ["surge", "mihomo", "shadowrocket", "loon", "sing-box"]
 GFWLIST_NAME = "gfwlist"
 GFWLIST_URL = "https://raw.githubusercontent.com/gfwlist/gfwlist/master/gfwlist.txt"
+CHECK_IP_NAME = "check_ip"
+TEST_IPV6_MIRRORS_URL = "https://test-ipv6.com/mirrors.html.en_US"
 
 DOMAINSET_KINDS = {"DOMAIN", "DOMAIN-SUFFIX"}
 ORIGIN_KINDS = {"USER-AGENT", "SRC-PORT"}
@@ -189,6 +191,145 @@ def fetch_gfwlist_rules() -> list[Rule]:
         if rule:
             rules.append(rule)
     return rules
+
+
+def fetch_text(url: str, timeout: int = 30) -> str:
+    req = urllib.request.Request(
+        url,
+        headers={"User-Agent": "rulesets-generator/1.0"},
+    )
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        return resp.read().decode("utf-8", errors="ignore")
+
+
+def extract_js_object(text: str, marker: str) -> str | None:
+    # Accept optional spaces around assignment, e.g. `foo = { ... }`.
+    assign = re.search(rf"{re.escape(marker)}\s*=\s*", text)
+    if not assign:
+        return None
+
+    brace_start = text.find("{", assign.end())
+    if brace_start < 0:
+        return None
+
+    depth = 0
+    in_string = False
+    escaped = False
+
+    for idx in range(brace_start, len(text)):
+        ch = text[idx]
+        if in_string:
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == '"':
+                in_string = False
+            continue
+
+        if ch == '"':
+            in_string = True
+            continue
+
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return text[brace_start : idx + 1]
+
+    return None
+
+
+def parse_js_object_as_dict(raw_object: str) -> dict:
+    try:
+        parsed = json.loads(raw_object)
+    except json.JSONDecodeError:
+        # Tolerate trailing commas from JS objects.
+        normalized = re.sub(r",\s*([}\]])", r"\1", raw_object)
+        parsed = json.loads(normalized)
+
+    if not isinstance(parsed, dict):
+        raise RuntimeError("Parsed sites payload is not a JSON object")
+    return parsed
+
+
+def candidate_test_ipv6_index_js_urls(html: str) -> list[str]:
+    urls: list[str] = []
+
+    for src in re.findall(r"<script[^>]+src=[\"']([^\"']+)[\"']", html, flags=re.IGNORECASE):
+        if "index.js" in src:
+            urls.append(urllib.parse.urljoin(TEST_IPV6_MIRRORS_URL, src))
+
+    # Deterministic fallback list in case mirrors page structure changes.
+    urls.extend(
+        [
+            urllib.parse.urljoin(TEST_IPV6_MIRRORS_URL, "/index.js.en_US"),
+            urllib.parse.urljoin(TEST_IPV6_MIRRORS_URL, "/index.js"),
+        ]
+    )
+
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for url in urls:
+        if url not in seen:
+            seen.add(url)
+            deduped.append(url)
+    return deduped
+
+
+def is_cn_location(loc: str) -> bool:
+    upper = loc.upper()
+    return bool(re.search(r"\bCN\b", upper) or "CHINA" in upper)
+
+
+def parse_mirror_sites(script: str) -> dict:
+    marker_variants = ["GIGO.sites_parsed", "sites_parsed"]
+    for marker in marker_variants:
+        sites_object = extract_js_object(script, marker)
+        if not sites_object:
+            continue
+        try:
+            return parse_js_object_as_dict(sites_object)
+        except Exception:
+            continue
+    raise RuntimeError("Could not locate/parse sites_parsed object in test-ipv6 script")
+
+
+def fetch_test_ipv6_non_cn_mirror_rules() -> list[Rule]:
+    html = fetch_text(TEST_IPV6_MIRRORS_URL)
+    scripts = candidate_test_ipv6_index_js_urls(html)
+
+    sites: dict | None = None
+    last_error: Exception | None = None
+    for script_url in scripts:
+        try:
+            script = fetch_text(script_url)
+            sites = parse_mirror_sites(script)
+            break
+        except Exception as exc:
+            last_error = exc
+
+    if sites is None:
+        detail = str(last_error) if last_error else "unknown error"
+        raise RuntimeError(f"Failed to parse test-ipv6 mirror source: {detail}")
+
+    domains: set[str] = set()
+
+    for item in sites.values():
+        if not isinstance(item, dict):
+            continue
+        if not bool(item.get("mirror")):
+            continue
+
+        if is_cn_location(str(item.get("loc", ""))):
+            continue
+
+        domain = normalize_domain_from_host(str(item.get("site", "")))
+        if domain:
+            domains.add(domain)
+
+    return [Rule("DOMAIN-SUFFIX", domain) for domain in sorted(domains)]
 
 
 def write_lines(file_path: Path, lines: Iterable[str]) -> bool:
@@ -551,7 +692,15 @@ def load_rules(bundle: Bundle) -> list[Rule]:
     source_str = str(bundle.source)
     if source_str.startswith("upstream:"):
         return fetch_gfwlist_rules()
-    return parse_file(bundle.source)
+
+    rules = parse_file(bundle.source)
+    if bundle.name == CHECK_IP_NAME:
+        try:
+            rules.extend(fetch_test_ipv6_non_cn_mirror_rules())
+        except Exception as exc:
+            print(f"[WARN] Failed to enrich '{CHECK_IP_NAME}' with test-ipv6 mirrors: {exc}")
+
+    return rules
 
 
 def write_manifest(entries: list[tuple[Bundle, list[Rule]]], failures: list[GenerationFailure]) -> None:
