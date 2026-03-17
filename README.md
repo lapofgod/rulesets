@@ -2,7 +2,7 @@
 
 一个基于**平台无关规则源**自动生成多客户端规则文件的仓库。
 
-> Single Source of Truth: `src/*.conf`（非隐藏文件）
+> Single Source of Truth: `src/*.conf` + `src/*.py`（非隐藏文件）
 
 支持目标：
 - Surge
@@ -16,7 +16,8 @@
 ```text
 .
 ├── src/
-│   └── *.conf             # 规则源（Mihomo 规则 + URL-REGEX + USER-AGENT）
+│   ├── *.conf             # 静态规则源（Mihomo 规则 + URL-REGEX + USER-AGENT）
+│   └── *.py               # 可插拔规则源，需实现 generate_conf_lines()
 ├── scripts/
 │   └── generate_rules.py  # 生成器
 ├── pyproject.toml         # 依赖与项目元数据（uv）
@@ -50,12 +51,17 @@ surge/endpoints/README.MD
 
 ## 规则源格式
 
-`src/` 下所有不以 `.` 开头的 `.conf` 文件都会被自动检索并生成，规则名取文件名（去掉 `.conf`）。
-以 `#` 开头的行会被视为注释并忽略。
+`src/` 下所有不以 `.` 开头的 `.conf` 与 `.py` 文件都会被自动检索并生成，规则名取文件名（去掉扩展名）。
 
-此外会自动从上游拉取 `gfwlist`（`gfwlist/gfwlist`），作为固定项目名 `gfwlist` 一起生成。
+- `.conf`：按原有逻辑逐行解析；以 `#` 开头的行会被视为注释并忽略。
+- `.py`：需导出 `generate_conf_lines()`，返回 `str` 或 `iterable[str]`，内容格式与 `.conf` 每行规则一致。
 
-若某个项目（包括 `gfwlist`）生成失败：
+冲突规则：
+- 若同名 `.conf` 与 `.py` 同时存在（例如 `foo.conf` + `foo.py`），只会将该项目标记为失败，不影响其它项目生成。
+
+当前 `gfwlist` 与 `check_ip` 已迁移为 `src/gfwlist.py` 与 `src/check_ip.py`。
+
+若某个项目生成失败：
 - 只会记录该项目失败，不会中断其他项目生成。
 - 发布到 `generated` 分支时会沿用该项目上一次已存在的文件版本。
 

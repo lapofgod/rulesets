@@ -2,13 +2,12 @@
 from __future__ import annotations
 
 import argparse
-import base64
+import importlib.util
 import json
 import re
 import shutil
 import subprocess
-import urllib.parse
-import urllib.request
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -23,10 +22,6 @@ RULESET_BASELINE = "mihomo"
 GITHUB_REPO = "lapofgod/rulesets"
 PUBLISH_BRANCH = "generated"
 TARGETS = ["surge", "mihomo", "shadowrocket", "loon", "sing-box"]
-GFWLIST_NAME = "gfwlist"
-GFWLIST_URL = "https://raw.githubusercontent.com/gfwlist/gfwlist/master/gfwlist.txt"
-CHECK_IP_NAME = "check_ip"
-TEST_IPV6_MIRRORS_URL = "https://test-ipv6.com/mirrors.html.en_US"
 
 DOMAINSET_KINDS = {"DOMAIN", "DOMAIN-SUFFIX"}
 ORIGIN_KINDS = {"USER-AGENT", "SRC-PORT"}
@@ -47,6 +42,7 @@ class Rule:
 class Bundle:
     name: str
     source: Path
+    source_type: str = "conf"
 
 
 @dataclass(frozen=True)
@@ -104,232 +100,46 @@ def parse_file(file_path: Path) -> list[Rule]:
     return rules
 
 
-def fetch_gfwlist_raw() -> str:
-    req = urllib.request.Request(
-        GFWLIST_URL,
-        headers={"User-Agent": "rulesets-generator/1.0"},
-    )
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        data = resp.read()
+def parse_python_file(file_path: Path) -> list[Rule]:
+    module_name = f"rulesource_{file_path.stem}"
+    spec = importlib.util.spec_from_file_location(module_name, file_path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"Unable to load module spec: {file_path}")
 
-    text = data.decode("utf-8", errors="ignore").strip()
+    module = importlib.util.module_from_spec(spec)
     try:
-        decoded = base64.b64decode(text, validate=False).decode("utf-8", errors="ignore")
-        if "[AutoProxy" in decoded or "||" in decoded:
-            return decoded
-    except Exception:
-        pass
+        spec.loader.exec_module(module)
+    except Exception as exc:
+        raise RuntimeError(f"Failed to execute python source '{file_path.name}': {exc}") from exc
 
-    return text
+    generator = getattr(module, "generate_conf_lines", None)
+    if not callable(generator):
+        raise RuntimeError(f"'{file_path.name}' must define callable generate_conf_lines()")
 
+    try:
+        generated = generator()
+    except Exception as exc:
+        raise RuntimeError(f"generate_conf_lines() failed in '{file_path.name}': {exc}") from exc
 
-def normalize_domain_from_host(host: str) -> str | None:
-    host = host.strip().lower().strip(".")
-    if not host:
-        return None
-    if host.startswith("*"):
-        host = host.lstrip("*").lstrip(".")
-    if host.startswith("[") and host.endswith("]"):
-        return None
-    if re.fullmatch(r"\d+\.\d+\.\d+\.\d+", host):
-        return None
-    if "." not in host:
-        return None
-    if any(ch not in "abcdefghijklmnopqrstuvwxyz0123456789.-" for ch in host):
-        return None
-    return host
-
-
-def parse_gfwlist_line(line: str) -> Rule | None:
-    line = line.strip()
-    if not line:
-        return None
-    if line.startswith("!") or line.startswith("["):
-        return None
-    if line.startswith("@@"):
-        return None
-
-    # Strip adblock options.
-    if "$" in line:
-        line = line.split("$", 1)[0]
-
-    if line.startswith("||"):
-        dom = normalize_domain_from_host(line[2:])
-        return Rule("DOMAIN-SUFFIX", dom) if dom else None
-
-    if line.startswith("|"):
-        line = line[1:]
-
-    if line.startswith("http://") or line.startswith("https://"):
+    if isinstance(generated, str):
+        raw_lines = generated.splitlines()
+    else:
         try:
-            host = urllib.parse.urlparse(line).hostname
-            dom = normalize_domain_from_host(host or "")
-            return Rule("DOMAIN-SUFFIX", dom) if dom else None
-        except Exception:
-            return None
+            raw_lines = list(generated)
+        except TypeError as exc:
+            raise RuntimeError(
+                f"generate_conf_lines() in '{file_path.name}' must return str or iterable[str]"
+            ) from exc
 
-    if line.startswith("."):
-        dom = normalize_domain_from_host(line[1:])
-        return Rule("DOMAIN-SUFFIX", dom) if dom else None
-
-    if line.startswith("*."):
-        dom = normalize_domain_from_host(line[2:])
-        return Rule("DOMAIN-SUFFIX", dom) if dom else None
-
-    if any(token in line for token in ["*", "^", "/", "?"]):
-        return None
-
-    dom = normalize_domain_from_host(line)
-    return Rule("DOMAIN-SUFFIX", dom) if dom else None
-
-
-def fetch_gfwlist_rules() -> list[Rule]:
-    raw = fetch_gfwlist_raw()
     rules: list[Rule] = []
-    for line in raw.splitlines():
-        rule = parse_gfwlist_line(line)
-        if rule:
-            rules.append(rule)
+    for idx, line in enumerate(raw_lines, start=1):
+        if not isinstance(line, str):
+            raise RuntimeError(f"'{file_path.name}' returned non-string line at index {idx}")
+        parsed = parse_conf_line(line)
+        if parsed:
+            rules.append(parsed)
+
     return rules
-
-
-def fetch_text(url: str, timeout: int = 30) -> str:
-    req = urllib.request.Request(
-        url,
-        headers={"User-Agent": "rulesets-generator/1.0"},
-    )
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        return resp.read().decode("utf-8", errors="ignore")
-
-
-def extract_js_object(text: str, marker: str) -> str | None:
-    # Accept optional spaces around assignment, e.g. `foo = { ... }`.
-    assign = re.search(rf"{re.escape(marker)}\s*=\s*", text)
-    if not assign:
-        return None
-
-    brace_start = text.find("{", assign.end())
-    if brace_start < 0:
-        return None
-
-    depth = 0
-    in_string = False
-    escaped = False
-
-    for idx in range(brace_start, len(text)):
-        ch = text[idx]
-        if in_string:
-            if escaped:
-                escaped = False
-            elif ch == "\\":
-                escaped = True
-            elif ch == '"':
-                in_string = False
-            continue
-
-        if ch == '"':
-            in_string = True
-            continue
-
-        if ch == "{":
-            depth += 1
-        elif ch == "}":
-            depth -= 1
-            if depth == 0:
-                return text[brace_start : idx + 1]
-
-    return None
-
-
-def parse_js_object_as_dict(raw_object: str) -> dict:
-    try:
-        parsed = json.loads(raw_object)
-    except json.JSONDecodeError:
-        # Tolerate trailing commas from JS objects.
-        normalized = re.sub(r",\s*([}\]])", r"\1", raw_object)
-        parsed = json.loads(normalized)
-
-    if not isinstance(parsed, dict):
-        raise RuntimeError("Parsed sites payload is not a JSON object")
-    return parsed
-
-
-def candidate_test_ipv6_index_js_urls(html: str) -> list[str]:
-    urls: list[str] = []
-
-    for src in re.findall(r"<script[^>]+src=[\"']([^\"']+)[\"']", html, flags=re.IGNORECASE):
-        if "index.js" in src:
-            urls.append(urllib.parse.urljoin(TEST_IPV6_MIRRORS_URL, src))
-
-    # Deterministic fallback list in case mirrors page structure changes.
-    urls.extend(
-        [
-            urllib.parse.urljoin(TEST_IPV6_MIRRORS_URL, "/index.js.en_US"),
-            urllib.parse.urljoin(TEST_IPV6_MIRRORS_URL, "/index.js"),
-        ]
-    )
-
-    deduped: list[str] = []
-    seen: set[str] = set()
-    for url in urls:
-        if url not in seen:
-            seen.add(url)
-            deduped.append(url)
-    return deduped
-
-
-def is_cn_location(loc: str) -> bool:
-    upper = loc.upper()
-    return bool(re.search(r"\bCN\b", upper) or "CHINA" in upper)
-
-
-def parse_mirror_sites(script: str) -> dict:
-    marker_variants = ["GIGO.sites_parsed", "sites_parsed"]
-    for marker in marker_variants:
-        sites_object = extract_js_object(script, marker)
-        if not sites_object:
-            continue
-        try:
-            return parse_js_object_as_dict(sites_object)
-        except Exception:
-            continue
-    raise RuntimeError("Could not locate/parse sites_parsed object in test-ipv6 script")
-
-
-def fetch_test_ipv6_non_cn_mirror_rules() -> list[Rule]:
-    html = fetch_text(TEST_IPV6_MIRRORS_URL)
-    scripts = candidate_test_ipv6_index_js_urls(html)
-
-    sites: dict | None = None
-    last_error: Exception | None = None
-    for script_url in scripts:
-        try:
-            script = fetch_text(script_url)
-            sites = parse_mirror_sites(script)
-            break
-        except Exception as exc:
-            last_error = exc
-
-    if sites is None:
-        detail = str(last_error) if last_error else "unknown error"
-        raise RuntimeError(f"Failed to parse test-ipv6 mirror source: {detail}")
-
-    domains: set[str] = set()
-
-    for item in sites.values():
-        if not isinstance(item, dict):
-            continue
-        if not bool(item.get("mirror")):
-            continue
-
-        if is_cn_location(str(item.get("loc", ""))):
-            continue
-
-        domain = normalize_domain_from_host(str(item.get("site", "")))
-        if domain:
-            domains.add(domain)
-
-    return [Rule("DOMAIN-SUFFIX", domain) for domain in sorted(domains)]
 
 
 def write_lines(file_path: Path, lines: Iterable[str]) -> bool:
@@ -609,98 +419,165 @@ def compile_sing_box(source_json: Path, out_srs: Path) -> None:
     subprocess.run([binary, "rule-set", "compile", "--output", str(out_srs), str(source_json)], check=True)
 
 
-def emit_one(bundle: Bundle, raw_rules: list[Rule], compile_srs: bool, generated_at: str) -> dict[str, dict[str, list[str]]]:
-    generated_files: dict[str, dict[str, list[str]]] = {target: {} for target in TARGETS}
+class TargetEmitter(ABC):
+    target: str
 
-    def remember(target: str, rule_type: str, filename: str) -> None:
-        if rule_type not in generated_files[target]:
-            generated_files[target][rule_type] = []
-        generated_files[target][rule_type].append(filename)
+    @abstractmethod
+    def emit_bundle(self, bundle: Bundle, raw_rules: list[Rule], generated_at: str, compile_srs: bool) -> dict[str, list[str]]:
+        raise NotImplementedError
 
-    for target in ["surge", "shadowrocket", "loon"]:
-        mapped = map_rules_for_target(target, raw_rules)
+
+class ClassicalTargetEmitter(TargetEmitter):
+    def __init__(self, target: str) -> None:
+        self.target = target
+
+    def emit_bundle(self, bundle: Bundle, raw_rules: list[Rule], generated_at: str, compile_srs: bool) -> dict[str, list[str]]:
+        del compile_srs
+        emitted: dict[str, list[str]] = {}
+
+        mapped = map_rules_for_target(self.target, raw_rules)
         groups = split_rules(mapped)
 
         if write_lines_with_header(
-            output_path(target, "domains", f"{bundle.name}.list"),
-            domainset_entries_for_target(target, groups.domain),
+            output_path(self.target, "domains", f"{bundle.name}.list"),
+            domainset_entries_for_target(self.target, groups.domain),
             generated_at,
         ):
-            remember(target, "domains", f"{bundle.name}.list")
+            emitted.setdefault("domains", []).append(f"{bundle.name}.list")
         if write_lines_with_header(
-            output_path(target, "endpoints", f"{bundle.name}.conf"),
+            output_path(self.target, "endpoints", f"{bundle.name}.conf"),
             [rule.as_line for rule in groups.endpoint],
             generated_at,
         ):
-            remember(target, "endpoints", f"{bundle.name}.conf")
+            emitted.setdefault("endpoints", []).append(f"{bundle.name}.conf")
         if write_lines_with_header(
-            output_path(target, "origins", f"{bundle.name}.conf"),
+            output_path(self.target, "origins", f"{bundle.name}.conf"),
             [rule.as_line for rule in groups.origins],
             generated_at,
         ):
-            remember(target, "origins", f"{bundle.name}.conf")
+            emitted.setdefault("origins", []).append(f"{bundle.name}.conf")
 
-    mihomo_mapped = map_rules_for_target("mihomo", raw_rules)
-    mihomo_groups = split_rules(mihomo_mapped)
-    if write_lines_with_header(
-        output_path("mihomo", "domains", f"{bundle.name}.list"),
-        domainset_entries_for_target("mihomo", mihomo_groups.domain),
-        generated_at,
-    ):
-        remember("mihomo", "domains", f"{bundle.name}.list")
-    if mihomo_groups.endpoint:
-        out = output_path("mihomo", "endpoints", f"{bundle.name}.yaml")
-        write_yaml_with_header(out, to_mihomo_payload(mihomo_groups.endpoint), len(mihomo_groups.endpoint), generated_at)
-        remember("mihomo", "endpoints", f"{bundle.name}.yaml")
-    if mihomo_groups.origins:
-        out = output_path("mihomo", "origins", f"{bundle.name}.yaml")
-        write_yaml_with_header(out, to_mihomo_payload(mihomo_groups.origins), len(mihomo_groups.origins), generated_at)
-        remember("mihomo", "origins", f"{bundle.name}.yaml")
+        return emitted
 
-    sing_mapped = map_rules_for_target("sing-box", raw_rules)
-    sing_groups = split_rules(sing_mapped)
-    sing_rules = [*sing_groups.domain, *sing_groups.endpoint, *sing_groups.origins]
-    if sing_rules:
-        rules_json = output_path("sing-box", "json", f"{bundle.name}.json")
+
+class MihomoTargetEmitter(TargetEmitter):
+    target = "mihomo"
+
+    def emit_bundle(self, bundle: Bundle, raw_rules: list[Rule], generated_at: str, compile_srs: bool) -> dict[str, list[str]]:
+        del compile_srs
+        emitted: dict[str, list[str]] = {}
+
+        mapped = map_rules_for_target(self.target, raw_rules)
+        groups = split_rules(mapped)
+
+        if write_lines_with_header(
+            output_path(self.target, "domains", f"{bundle.name}.list"),
+            domainset_entries_for_target(self.target, groups.domain),
+            generated_at,
+        ):
+            emitted.setdefault("domains", []).append(f"{bundle.name}.list")
+
+        if groups.endpoint:
+            out = output_path(self.target, "endpoints", f"{bundle.name}.yaml")
+            write_yaml_with_header(out, to_mihomo_payload(groups.endpoint), len(groups.endpoint), generated_at)
+            emitted.setdefault("endpoints", []).append(f"{bundle.name}.yaml")
+
+        if groups.origins:
+            out = output_path(self.target, "origins", f"{bundle.name}.yaml")
+            write_yaml_with_header(out, to_mihomo_payload(groups.origins), len(groups.origins), generated_at)
+            emitted.setdefault("origins", []).append(f"{bundle.name}.yaml")
+
+        return emitted
+
+
+class SingBoxTargetEmitter(TargetEmitter):
+    target = "sing-box"
+
+    def emit_bundle(self, bundle: Bundle, raw_rules: list[Rule], generated_at: str, compile_srs: bool) -> dict[str, list[str]]:
+        del generated_at
+        emitted: dict[str, list[str]] = {}
+
+        mapped = map_rules_for_target(self.target, raw_rules)
+        groups = split_rules(mapped)
+        rules = [*groups.domain, *groups.endpoint, *groups.origins]
+
+        if not rules:
+            return emitted
+
+        rules_json = output_path(self.target, "json", f"{bundle.name}.json")
         rules_json.parent.mkdir(parents=True, exist_ok=True)
         rules_json.write_text(
-            json.dumps(to_sing_box_rules(sing_rules), ensure_ascii=False, indent=2) + "\n",
+            json.dumps(to_sing_box_rules(rules), ensure_ascii=False, indent=2) + "\n",
             encoding="utf-8",
         )
-        remember("sing-box", "json", f"{bundle.name}.json")
+        emitted.setdefault("json", []).append(f"{bundle.name}.json")
+
         if compile_srs:
-            compile_sing_box(rules_json, output_path("sing-box", "srs", f"{bundle.name}.srs"))
-            remember("sing-box", "srs", f"{bundle.name}.srs")
+            compile_sing_box(rules_json, output_path(self.target, "srs", f"{bundle.name}.srs"))
+            emitted.setdefault("srs", []).append(f"{bundle.name}.srs")
+
+        return emitted
+
+
+def build_target_emitters() -> list[TargetEmitter]:
+    return [
+        ClassicalTargetEmitter("surge"),
+        MihomoTargetEmitter(),
+        ClassicalTargetEmitter("shadowrocket"),
+        ClassicalTargetEmitter("loon"),
+        SingBoxTargetEmitter(),
+    ]
+
+
+def emit_one(bundle: Bundle, raw_rules: list[Rule], compile_srs: bool, generated_at: str) -> dict[str, dict[str, list[str]]]:
+    generated_files: dict[str, dict[str, list[str]]] = {target: {} for target in TARGETS}
+
+    for emitter in build_target_emitters():
+        emitted = emitter.emit_bundle(bundle, raw_rules, generated_at=generated_at, compile_srs=compile_srs)
+        if emitted:
+            generated_files[emitter.target] = emitted
 
     return generated_files
 
 
 def iter_sources() -> list[Bundle]:
-    entries: list[Bundle] = []
+    conf_sources: dict[str, Path] = {}
+    py_sources: dict[str, Path] = {}
+
     for source in sorted(SOURCE_ROOT.glob("*.conf")):
         if source.name.startswith("."):
             continue
-        bundle = Bundle(name=source.stem, source=source)
-        entries.append(bundle)
+        conf_sources[source.stem] = source
 
-    gfw_bundle = Bundle(name=GFWLIST_NAME, source=Path(f"upstream:{GFWLIST_URL}"))
-    entries.append(gfw_bundle)
+    for source in sorted(SOURCE_ROOT.glob("*.py")):
+        if source.name.startswith("."):
+            continue
+        py_sources[source.stem] = source
+
+    entries: list[Bundle] = []
+    all_names = sorted(set(conf_sources) | set(py_sources))
+    for name in all_names:
+        has_conf = name in conf_sources
+        has_py = name in py_sources
+
+        if has_conf and has_py:
+            entries.append(Bundle(name=name, source=conf_sources[name], source_type="conflict"))
+        elif has_py:
+            entries.append(Bundle(name=name, source=py_sources[name], source_type="py"))
+        else:
+            entries.append(Bundle(name=name, source=conf_sources[name], source_type="conf"))
+
     return entries
 
 
 def load_rules(bundle: Bundle) -> list[Rule]:
-    source_str = str(bundle.source)
-    if source_str.startswith("upstream:"):
-        return fetch_gfwlist_rules()
-
-    rules = parse_file(bundle.source)
-    if bundle.name == CHECK_IP_NAME:
-        try:
-            rules.extend(fetch_test_ipv6_non_cn_mirror_rules())
-        except Exception as exc:
-            print(f"[WARN] Failed to enrich '{CHECK_IP_NAME}' with test-ipv6 mirrors: {exc}")
-
-    return rules
+    if bundle.source_type == "conflict":
+        raise RuntimeError(
+            f"Conflicting sources for '{bundle.name}': both {bundle.name}.conf and {bundle.name}.py exist"
+        )
+    if bundle.source_type == "py":
+        return parse_python_file(bundle.source)
+    return parse_file(bundle.source)
 
 
 def write_manifest(entries: list[tuple[Bundle, list[Rule]]], failures: list[GenerationFailure]) -> None:
@@ -712,7 +589,7 @@ def write_manifest(entries: list[tuple[Bundle, list[Rule]]], failures: list[Gene
             return raw.replace("https:/", "https://", 1).replace("http:/", "http://", 1)
 
     manifest = {
-        "single_source_of_truth": "src/*.conf (non-hidden)",
+        "single_source_of_truth": "src/*.conf + src/*.py (non-hidden)",
         "ruleset_baseline": RULESET_BASELINE,
         "sources": [
             {
@@ -736,7 +613,7 @@ def write_manifest(entries: list[tuple[Bundle, list[Rule]]], failures: list[Gene
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Generate multi-client rules from src/*.conf")
+    parser = argparse.ArgumentParser(description="Generate multi-client rules from src/*.conf and src/*.py")
     parser.add_argument(
         "--skip-sing-box-compile",
         action="store_true",
