@@ -191,7 +191,6 @@ python scripts/generate_rules.py \
 额外规则：
 - 工作流固定只向 `generated` 分支提交产物，不会写回源码分支（例如 `main`）。
 - `main` 分支默认忽略本地产物目录 `generated/`。
-- 发布脚本 `scripts/publish_generated_branch.sh` 支持 `--dry-run`，可本地预演分支发布流程且不 commit/push。
 
 ## Agent Guidance
 

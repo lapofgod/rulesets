@@ -67,4 +67,75 @@ jobs:
         env:
           TARGET_BRANCH: generated
         run: |
-          bash scripts/publish_generated_branch.sh "$TARGET_BRANCH" generated
+          set -euo pipefail
+
+          PUBLISH_ROOT=generated
+          if [ ! -d "$PUBLISH_ROOT" ]; then
+            echo "Publish root does not exist: $PUBLISH_ROOT" >&2
+            exit 1
+          fi
+
+          PUBLISH_DIR="$(mktemp -d)"
+          cleanup() {
+            rm -rf "$PUBLISH_DIR"
+          }
+          trap cleanup EXIT
+
+          cp -a "$PUBLISH_ROOT"/. "$PUBLISH_DIR"/
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if git ls-remote --exit-code --heads origin "$TARGET_BRANCH" >/dev/null 2>&1; then
+            git fetch origin "$TARGET_BRANCH"
+            git checkout -B "$TARGET_BRANCH" "origin/$TARGET_BRANCH"
+          else
+            git checkout --orphan "$TARGET_BRANCH"
+            find . -mindepth 1 -maxdepth 1 ! -name ".git" -exec rm -rf {} +
+          fi
+
+          for entry in "$PUBLISH_DIR"/* "$PUBLISH_DIR"/.[!.]* "$PUBLISH_DIR"/..?*; do
+            [ -e "$entry" ] || continue
+            name="$(basename "$entry")"
+            [ "$name" = ".git" ] && continue
+            cp -a "$entry" ./
+          done
+
+          # CI-only safeguard: if a previously published artifact becomes empty in this run,
+          # keep the file path as an empty file to avoid external URL 404.
+          while IFS= read -r tracked; do
+            [ -n "$tracked" ] || continue
+            if [ ! -f "$PUBLISH_DIR/$tracked" ] && [ -f "$tracked" ]; then
+              : > "$tracked"
+            fi
+          done < <(
+            git ls-files \
+              '*.list' \
+              '*.conf' \
+              '*.yaml' \
+              '*.json' \
+              '*.srs'
+          )
+
+          # Keep generated branch clean from Python cache artifacts.
+          cat > .gitignore <<'EOF'
+          __pycache__/
+          *.pyc
+          *.pyo
+          cache/
+          EOF
+
+          # Remove accidentally tracked cache files from previous runs.
+          git rm -r --cached --ignore-unmatch src/__pycache__ || true
+          git rm -r --cached --ignore-unmatch cache || true
+          find . -type d -name "__pycache__" -prune -exec rm -rf {} +
+
+          git add -A .
+
+          if git diff --staged --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+
+          git commit -m "chore: auto-generate rules"
+          git push origin HEAD:"$TARGET_BRANCH"
