@@ -25,9 +25,9 @@
     {
       "name": "check_ip",
       "source": "src/check_ip.py",
-      "rule_count": 27,
+      "rule_count": 60,
       "group_count": {
-        "domain": 27,
+        "domain": 60,
         "endpoint": 0,
         "origins": 0
       }
