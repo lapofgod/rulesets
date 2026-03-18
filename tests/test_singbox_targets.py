@@ -84,6 +84,36 @@ class SingBoxMappingTests(unittest.TestCase):
         self.assertEqual(rendered[1], {"port": [443]})
         self.assertEqual(rendered[2], {"domain": ["b.com"]})
 
+    def test_to_sing_box_rules_merges_adjacent_same_kind(self) -> None:
+        rules = [
+            self._parse("DOMAIN,a.com"),
+            self._parse("DOMAIN,b.com"),
+            self._parse("DST-PORT,443"),
+            self._parse("DST-PORT,8443"),
+        ]
+
+        payload, warnings = to_sing_box_rules(rules)
+        self.assertEqual(warnings, [])
+
+        rendered = payload["rules"]
+        self.assertEqual(rendered[0], {"domain": ["a.com", "b.com"]})
+        self.assertEqual(rendered[1], {"port": [443, 8443]})
+
+    def test_to_sing_box_rules_does_not_merge_across_other_kinds(self) -> None:
+        rules = [
+            self._parse("DOMAIN,a.com"),
+            self._parse("DST-PORT,443"),
+            self._parse("DOMAIN,b.com"),
+        ]
+
+        payload, warnings = to_sing_box_rules(rules)
+        self.assertEqual(warnings, [])
+
+        rendered = payload["rules"]
+        self.assertEqual(rendered[0], {"domain": ["a.com"]})
+        self.assertEqual(rendered[1], {"port": [443]})
+        self.assertEqual(rendered[2], {"domain": ["b.com"]})
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -171,6 +171,49 @@ def to_sing_box_rule(rule: Rule) -> tuple[dict | None, str | None]:
     return None, f"Rule kind '{rule.kind}' is not supported by sing-box conversion"
 
 
+def merge_adjacent_sing_box_rules(rules: list[dict]) -> list[dict]:
+    merged: list[dict] = []
+
+    for current in rules:
+        if not merged:
+            merged.append(current)
+            continue
+
+        previous = merged[-1]
+
+        # Keep logical rules independent to preserve exact tree semantics.
+        if previous.get("type") == "logical" or current.get("type") == "logical":
+            merged.append(current)
+            continue
+
+        previous_list_keys = [key for key, value in previous.items() if isinstance(value, list)]
+        current_list_keys = [key for key, value in current.items() if isinstance(value, list)]
+
+        if len(previous_list_keys) != 1 or len(current_list_keys) != 1:
+            merged.append(current)
+            continue
+
+        previous_list_key = previous_list_keys[0]
+        current_list_key = current_list_keys[0]
+        if previous_list_key != current_list_key:
+            merged.append(current)
+            continue
+
+        previous_scalars = {
+            key: value for key, value in previous.items() if key != previous_list_key and not isinstance(value, list)
+        }
+        current_scalars = {
+            key: value for key, value in current.items() if key != current_list_key and not isinstance(value, list)
+        }
+        if previous_scalars != current_scalars:
+            merged.append(current)
+            continue
+
+        previous[previous_list_key].extend(current[current_list_key])
+
+    return merged
+
+
 def to_sing_box_rules(rules: list[Rule]) -> tuple[dict, list[str]]:
     mapped: list[dict] = []
     warnings: list[str] = []
@@ -182,7 +225,7 @@ def to_sing_box_rules(rules: list[Rule]) -> tuple[dict, list[str]]:
         if converted is not None:
             mapped.append(converted)
 
-    return {"version": 1, "rules": mapped}, warnings
+    return {"version": 1, "rules": merge_adjacent_sing_box_rules(mapped)}, warnings
 
 
 def compile_sing_box(source_json: Path, out_srs: Path) -> None:
