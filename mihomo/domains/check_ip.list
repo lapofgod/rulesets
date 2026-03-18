@@ -1,15 +1,12 @@
 # Auto-generated file. Do not edit manually.
-# Rule count: 60
-# Generated at: 2026-03-18T04:10:33.130Z
+# Rule count: 27
+# Generated at: 2026-03-18T04:13:34.868Z
 
 +.123169.xyz
-+.amsterdam.test-ipv6.com
 +.api.myip.la
 +.browserleaks.com
 +.checkip.amazonaws.com
-+.chennai.test-ipv6.com
 +.dnsleaktest.com
-+.frankfurt.test-ipv6.com
 +.httpbin.org
 +.icanhazip.com
 +.ident.me
@@ -23,42 +20,12 @@
 +.ip125.com
 +.ip2location.com
 +.ip2location.io
-+.ip6.ro
 +.ipify.org
 +.ipinfo.io
 +.ipleak.net
 +.ippure.com
-+.ipv6.uz
-+.losangeles.test-ipv6.com
-+.main.test-ipv6.com
-+.miami.test-ipv6.com
 +.myip.la
-+.newark.test-ipv6.com
-+.osaka.test-ipv6.com
 +.ping0.cc
-+.saopaulo.test-ipv6.com
-+.singapore.test-ipv6.com
-+.sixte.st
-+.sydney.test-ipv6.com
-+.test-ipv6.alpinedc.ch
-+.test-ipv6.amelek.net
-+.test-ipv6.carnet.hr
-+.test-ipv6.cl
-+.test-ipv6.coloradointerlink.net
 +.test-ipv6.com
-+.test-ipv6.csclub.uwaterloo.ca
-+.test-ipv6.cz
-+.test-ipv6.datafiber.nl
-+.test-ipv6.epic.network
-+.test-ipv6.fratec.net
-+.test-ipv6.freerangecloud.com
-+.test-ipv6.hu
-+.test-ipv6.in
-+.test-ipv6.iu13.net
-+.test-ipv6.karsolink.com
-+.test-ipv6.noroutetohost.net
-+.test-ipv6.roedu.net
-+.testipv6.de
-+.triplebit.org
 +.whatismyipaddress.com
 +.whoer.net
