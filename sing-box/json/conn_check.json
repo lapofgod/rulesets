@@ -23,12 +23,6 @@
         "connectivitycheck.gtapheneos.network",
         "grapheneos.online"
       ]
-    },
-    {
-      "domain_regex": [
-        "^http://fedoraproject\\.org/static/hotspot\\.txt",
-        "^http://edge\\.microsoft\\.com/captiveportal/generate_204"
-      ]
     }
   ]
 }
