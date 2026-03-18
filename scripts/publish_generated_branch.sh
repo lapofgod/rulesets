@@ -89,7 +89,6 @@ EOF
 git rm -r --cached --ignore-unmatch src/__pycache__ || true
 git rm -r --cached --ignore-unmatch cache || true
 find . -type d -name "__pycache__" -prune -exec rm -rf {} +
-rm -rf cache
 
 git add -A .
 
