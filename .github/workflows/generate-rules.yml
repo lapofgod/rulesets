@@ -94,6 +94,9 @@ jobs:
             find . -mindepth 1 -maxdepth 1 ! -name ".git" -exec rm -rf {} +
           fi
 
+          # Ensure artifacts are published directly at branch root (no nested generated/).
+          rm -rf generated
+
           for entry in "$PUBLISH_DIR"/* "$PUBLISH_DIR"/.[!.]* "$PUBLISH_DIR"/..?*; do
             [ -e "$entry" ] || continue
             name="$(basename "$entry")"
