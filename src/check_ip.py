@@ -3,10 +3,17 @@ from __future__ import annotations
 
 import json
 import re
+import time
 import urllib.parse
 import urllib.request
+from datetime import datetime, timezone
+from pathlib import Path
 
 TEST_IPV6_MIRRORS_URL = "https://test-ipv6.com/mirrors.html.en_US"
+CACHE_DIR = Path(__file__).resolve().parent.parent / "cache"
+MIRROR_CACHE_FILE = CACHE_DIR / "check_ip_mirrors.json"
+FETCH_TIMEOUTS = [8, 12, 20]
+FETCH_RETRY_BACKOFF_SECONDS = 0.8
 
 STATIC_LINES = [
     "DOMAIN-SUFFIX,123169.xyz",
@@ -43,6 +50,47 @@ def fetch_text(url: str, timeout: int = 30) -> str:
     req = urllib.request.Request(url, headers={"User-Agent": "rulesets-generator/1.0"})
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         return resp.read().decode("utf-8", errors="ignore")
+
+
+def fetch_text_with_retry(url: str) -> str:
+    last_error: Exception | None = None
+    for idx, timeout in enumerate(FETCH_TIMEOUTS, start=1):
+        try:
+            return fetch_text(url, timeout=timeout)
+        except Exception as exc:
+            last_error = exc
+            if idx < len(FETCH_TIMEOUTS):
+                # Exponential backoff for transient TLS/network spikes.
+                time.sleep(FETCH_RETRY_BACKOFF_SECONDS * idx)
+
+    detail = str(last_error) if last_error else "unknown error"
+    raise RuntimeError(f"fetch failed after {len(FETCH_TIMEOUTS)} attempts ({url}): {detail}")
+
+
+def load_mirror_cache() -> list[str]:
+    if not MIRROR_CACHE_FILE.exists():
+        return []
+
+    try:
+        payload = json.loads(MIRROR_CACHE_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+
+    domains = payload.get("domains")
+    if not isinstance(domains, list):
+        return []
+
+    valid_domains = [d for d in domains if isinstance(d, str) and normalize_domain_from_host(d)]
+    return sorted(set(valid_domains))
+
+
+def save_mirror_cache(domains: list[str]) -> None:
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "updated_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
+        "domains": sorted(set(domains)),
+    }
+    MIRROR_CACHE_FILE.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
 def extract_js_object(text: str, marker: str) -> str | None:
@@ -148,14 +196,14 @@ def is_cn_location(loc: str) -> bool:
 
 
 def dynamic_mirror_lines() -> list[str]:
-    html = fetch_text(TEST_IPV6_MIRRORS_URL)
+    html = fetch_text_with_retry(TEST_IPV6_MIRRORS_URL)
     candidates = candidate_index_js_urls(html)
 
     sites: dict | None = None
     last_error: Exception | None = None
     for script_url in candidates:
         try:
-            sites = parse_sites_payload(fetch_text(script_url))
+            sites = parse_sites_payload(fetch_text_with_retry(script_url))
             break
         except Exception as exc:
             last_error = exc
@@ -177,7 +225,20 @@ def dynamic_mirror_lines() -> list[str]:
         if domain:
             domains.add(domain)
 
-    return [f"DOMAIN-SUFFIX,{domain}" for domain in sorted(domains)]
+    sorted_domains = sorted(domains)
+    save_mirror_cache(sorted_domains)
+    return [f"DOMAIN-SUFFIX,{domain}" for domain in sorted_domains]
+
+
+def dedupe_lines_keep_order(lines: list[str]) -> list[str]:
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for line in lines:
+        if line in seen:
+            continue
+        seen.add(line)
+        deduped.append(line)
+    return deduped
 
 
 def generate_conf_lines() -> list[str]:
@@ -185,6 +246,12 @@ def generate_conf_lines() -> list[str]:
     try:
         lines.extend(dynamic_mirror_lines())
     except Exception as exc:
-        # Keep static fallback output when dynamic fetch fails.
-        print(f"[WARN] check_ip.py dynamic mirrors skipped: {exc}")
-    return lines
+        cached = load_mirror_cache()
+        if cached:
+            lines.extend(f"DOMAIN-SUFFIX,{domain}" for domain in cached)
+            print(f"[WARN] check_ip.py dynamic mirrors failed, using cache ({len(cached)}): {exc}")
+        else:
+            # Keep static fallback output when dynamic fetch fails.
+            print(f"[WARN] check_ip.py dynamic mirrors skipped (no cache): {exc}")
+
+    return dedupe_lines_keep_order(lines)

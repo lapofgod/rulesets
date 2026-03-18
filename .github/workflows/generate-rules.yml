@@ -27,6 +27,12 @@ jobs:
       - name: Setup uv
         uses: astral-sh/setup-uv@v4
 
+      - name: Restore runtime cache
+        uses: actions/cache@v4
+        with:
+          path: cache
+          key: rulesets-runtime-cache-${{ runner.os }}-v1
+
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
@@ -43,53 +49,25 @@ jobs:
       - name: Install dependencies
         run: uv sync --python .venv/bin/python
 
+      - name: Ensure cache directory
+        run: mkdir -p cache
+
       - name: Generate
-        run: .venv/bin/python scripts/generate_rules.py
+        env:
+          TARGET_BRANCH: generated
+        run: |
+          .venv/bin/python scripts/generate_rules.py \
+            --source-root src \
+            --output-root generated \
+            --ruleset-baseline mihomo \
+            --github-repo "${{ github.repository }}" \
+            --publish-branch "$TARGET_BRANCH"
+
+      - name: Prepare publish script
+        run: chmod +x scripts/publish_generated_branch.sh
 
       - name: Commit and push
         env:
           TARGET_BRANCH: generated
         run: |
-          set -euo pipefail
-
-          PUBLISH_DIR="$(mktemp -d)"
-          cp -a generated/. "$PUBLISH_DIR"/
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          if git ls-remote --exit-code --heads origin "$TARGET_BRANCH" >/dev/null 2>&1; then
-            git fetch origin "$TARGET_BRANCH"
-            git checkout -B "$TARGET_BRANCH" "origin/$TARGET_BRANCH"
-          else
-            git checkout --orphan "$TARGET_BRANCH"
-            find . -mindepth 1 -maxdepth 1 ! -name ".git" -exec rm -rf {} +
-          fi
-
-          for entry in "$PUBLISH_DIR"/* "$PUBLISH_DIR"/.[!.]* "$PUBLISH_DIR"/..?*; do
-            [ -e "$entry" ] || continue
-            name="$(basename "$entry")"
-            [ "$name" = ".git" ] && continue
-            cp -a "$entry" ./
-          done
-
-          # Keep generated branch clean from Python cache artifacts.
-          cat > .gitignore <<'EOF'
-          __pycache__/
-          *.pyc
-          *.pyo
-          EOF
-
-          # Remove accidentally tracked cache files from previous runs.
-          git rm -r --cached --ignore-unmatch src/__pycache__ || true
-          find . -type d -name "__pycache__" -prune -exec rm -rf {} +
-
-          git add -A .
-
-          if git diff --staged --quiet; then
-            echo "No changes to commit."
-            exit 0
-          fi
-
-          git commit -m "chore: auto-generate rules"
-          git push origin HEAD:"$TARGET_BRANCH"
+          bash scripts/publish_generated_branch.sh "$TARGET_BRANCH" generated

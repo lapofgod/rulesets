@@ -2,618 +2,46 @@
 from __future__ import annotations
 
 import argparse
-import importlib.util
-import json
-import re
-import shutil
-import subprocess
-from abc import ABC, abstractmethod
-from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Iterable
 
-import yaml
+from rulesgen.engine import GeneratorConfig, run_generation
 
-ROOT = Path(__file__).resolve().parent.parent
-SOURCE_ROOT = ROOT / "src"
-OUTPUT_ROOT = ROOT / "generated"
-RULESET_BASELINE = "mihomo"
-GITHUB_REPO = "lapofgod/rulesets"
-PUBLISH_BRANCH = "generated"
-TARGETS = ["surge", "mihomo", "shadowrocket", "loon", "sing-box"]
-
-DOMAINSET_KINDS = {"DOMAIN", "DOMAIN-SUFFIX"}
-ORIGIN_KINDS = {"USER-AGENT", "SRC-PORT"}
-
-
-@dataclass(frozen=True)
-class Rule:
-    kind: str
-    value: str
-    extras: tuple[str, ...] = ()
-
-    @property
-    def as_line(self) -> str:
-        return ",".join([self.kind, self.value, *self.extras])
-
-
-@dataclass(frozen=True)
-class Bundle:
-    name: str
-    source: Path
-    source_type: str = "conf"
-
-
-@dataclass(frozen=True)
-class GenerationFailure:
-    name: str
-    reason: str
-
-
-@dataclass(frozen=True)
-class RuleGroups:
-    domain: list[Rule]
-    endpoint: list[Rule]
-    origins: list[Rule]
-
-
-def normalize_kind(kind: str) -> str:
-    normalized = kind.strip().upper().replace("_", "-")
-    if normalized == "DEST-PORT":
-        return "DST-PORT"
-    return normalized
-
-
-def parse_conf_line(raw: str) -> Rule | None:
-    line = raw.strip()
-    # Support inline comments in .conf, e.g. `RULE,... # note`
-    line = re.split(r"\s+#", line, maxsplit=1)[0].strip()
-    if not line or line.startswith("#"):
-        return None
-
-    if line.startswith("."):
-        return Rule("DOMAIN-SUFFIX", line[1:])
-    if line.startswith("+.") or line.startswith("*."):
-        return Rule("DOMAIN-SUFFIX", line[2:])
-
-    parts = [part.strip() for part in line.split(",")]
-    if len(parts) < 2:
-        return None
-
-    kind = normalize_kind(parts[0])
-    value = parts[1]
-    extras = tuple(parts[2:]) if len(parts) > 2 else ()
-
-    if kind == "DOMAIN-SUFFIX" and value.startswith("."):
-        value = value[1:]
-
-    return Rule(kind, value, extras)
-
-
-def parse_file(file_path: Path) -> list[Rule]:
-    rules: list[Rule] = []
-    for line in file_path.read_text(encoding="utf-8").splitlines():
-        parsed = parse_conf_line(line)
-        if parsed:
-            rules.append(parsed)
-    return rules
-
-
-def parse_python_file(file_path: Path) -> list[Rule]:
-    module_name = f"rulesource_{file_path.stem}"
-    spec = importlib.util.spec_from_file_location(module_name, file_path)
-    if spec is None or spec.loader is None:
-        raise RuntimeError(f"Unable to load module spec: {file_path}")
-
-    module = importlib.util.module_from_spec(spec)
-    try:
-        spec.loader.exec_module(module)
-    except Exception as exc:
-        raise RuntimeError(f"Failed to execute python source '{file_path.name}': {exc}") from exc
-
-    generator = getattr(module, "generate_conf_lines", None)
-    if not callable(generator):
-        raise RuntimeError(f"'{file_path.name}' must define callable generate_conf_lines()")
-
-    try:
-        generated = generator()
-    except Exception as exc:
-        raise RuntimeError(f"generate_conf_lines() failed in '{file_path.name}': {exc}") from exc
-
-    if isinstance(generated, str):
-        raw_lines = generated.splitlines()
-    else:
-        try:
-            raw_lines = list(generated)
-        except TypeError as exc:
-            raise RuntimeError(
-                f"generate_conf_lines() in '{file_path.name}' must return str or iterable[str]"
-            ) from exc
-
-    rules: list[Rule] = []
-    for idx, line in enumerate(raw_lines, start=1):
-        if not isinstance(line, str):
-            raise RuntimeError(f"'{file_path.name}' returned non-string line at index {idx}")
-        parsed = parse_conf_line(line)
-        if parsed:
-            rules.append(parsed)
-
-    return rules
-
-
-def write_lines(file_path: Path, lines: Iterable[str]) -> bool:
-    line_list = list(lines)
-    if not line_list:
-        return False
-    file_path.parent.mkdir(parents=True, exist_ok=True)
-    file_path.write_text("\n".join(line_list).rstrip() + "\n", encoding="utf-8")
-    return True
-
-
-def write_lines_with_header(file_path: Path, lines: Iterable[str], generated_at: str) -> bool:
-    line_list = list(lines)
-    if not line_list:
-        return False
-
-    header = [
-        "# Auto-generated file. Do not edit manually.",
-        f"# Rule count: {len(line_list)}",
-        f"# Generated at: {generated_at}",
-        "",
-    ]
-    file_path.parent.mkdir(parents=True, exist_ok=True)
-    file_path.write_text("\n".join([*header, *line_list]).rstrip() + "\n", encoding="utf-8")
-    return True
-
-
-def write_yaml_with_header(file_path: Path, payload: dict, rule_count: int, generated_at: str) -> None:
-    header = [
-        "# Auto-generated file. Do not edit manually.",
-        f"# Rule count: {rule_count}",
-        f"# Generated at: {generated_at}",
-        "",
-    ]
-    body = yaml.safe_dump(payload, allow_unicode=True, sort_keys=False)
-    file_path.parent.mkdir(parents=True, exist_ok=True)
-    file_path.write_text("\n".join(header) + body, encoding="utf-8")
-
-
-def dedupe_sort_strings(items: Iterable[str]) -> list[str]:
-    return sorted(set(items))
-
-
-def map_rule_for_target(target: str, rule: Rule) -> Rule | None:
-    kind = rule.kind
-    value = rule.value
-    extras = rule.extras
-
-    if kind == "DST-PORT" and target in {"surge", "shadowrocket"}:
-        kind = "DEST-PORT"
-
-    if kind == "DOMAIN-WILDCARD":
-        if target == "loon":
-            if value.startswith("*."):
-                return Rule("DOMAIN-SUFFIX", value[2:], extras)
-            return None
-        if target == "sing-box":
-            if value.startswith("*."):
-                return Rule("DOMAIN-SUFFIX", value[2:], extras)
-            return Rule("DOMAIN-WILDCARD", value, extras)
-
-    if kind == "USER-AGENT" and target in {"mihomo", "sing-box"}:
-        return None
-
-    if kind == "URL-REGEX" and target == "mihomo":
-        return None
-
-    return Rule(kind, value, extras)
-
-
-def map_rules_for_target(target: str, rules: list[Rule]) -> list[Rule]:
-    mapped: list[Rule] = []
-    for rule in rules:
-        converted = map_rule_for_target(target, rule)
-        if converted is not None:
-            mapped.append(converted)
-    return mapped
-
-
-def split_rules(rules: list[Rule]) -> RuleGroups:
-    domain: list[Rule] = []
-    endpoint: list[Rule] = []
-    origins: list[Rule] = []
-
-    for rule in rules:
-        if rule.kind in DOMAINSET_KINDS:
-            domain.append(rule)
-        elif rule.kind in ORIGIN_KINDS:
-            origins.append(rule)
-        else:
-            endpoint.append(rule)
-
-    return RuleGroups(domain=domain, endpoint=endpoint, origins=origins)
-
-
-def output_path(target: str, rule_type: str, filename: str) -> Path:
-    return OUTPUT_ROOT / target / rule_type / filename
-
-
-def write_type_readme(target: str, rule_type: str, filenames: list[str]) -> None:
-    if not filenames:
-        return
-
-    sorted_files = sorted(set(filenames))
-    base_path = f"{target}/{rule_type}"
-    lines: list[str] = [
-        f"# {target}/{rule_type}",
-        "",
-        "This directory is auto-generated.",
-        "",
-    ]
-
-    if target == "mihomo":
-        lines.extend(["## Mihomo Usage", ""])
-        lines.extend(
-            [
-                "Use `domains` + `endpoints` + `origins` in parallel when available.",
-                "",
-            ]
-        )
-        for filename in sorted_files:
-            rel_path = f"{base_path}/{filename}"
-            raw_url = f"https://raw.githubusercontent.com/{GITHUB_REPO}/{PUBLISH_BRANCH}/{rel_path}"
-            provider_name = Path(filename).stem
-
-            if rule_type == "domains" and filename.endswith(".list"):
-                lines.extend(
-                    [
-                        f"### {filename}",
-                        "- Format: text",
-                        "- Behavior: domain",
-                        "```yaml",
-                        "rule-providers:",
-                        f"  {provider_name}_domains:",
-                        "    type: http",
-                        "    behavior: domain",
-                        "    format: text",
-                        f"    url: {raw_url}",
-                        f"    path: ./ruleset/{provider_name}.list",
-                        "    interval: 86400",
-                        "```",
-                        "",
-                    ]
-                )
-            elif rule_type == "endpoints" and filename.endswith(".yaml"):
-                lines.extend(
-                    [
-                        f"### {filename}",
-                        "- Format: yaml",
-                        "- Behavior: classical",
-                        "```yaml",
-                        "rule-providers:",
-                        f"  {provider_name}_endpoints:",
-                        "    type: http",
-                        "    behavior: classical",
-                        "    format: yaml",
-                        f"    url: {raw_url}",
-                        f"    path: ./ruleset/{provider_name}.yaml",
-                        "    interval: 86400",
-                        "```",
-                        "",
-                    ]
-                )
-            elif rule_type == "origins" and filename.endswith(".yaml"):
-                lines.extend(
-                    [
-                        f"### {filename}",
-                        "- Format: yaml",
-                        "- Behavior: classical",
-                        "```yaml",
-                        "rule-providers:",
-                        f"  {provider_name}_origins:",
-                        "    type: http",
-                        "    behavior: classical",
-                        "    format: yaml",
-                        f"    url: {raw_url}",
-                        f"    path: ./ruleset/{provider_name}.yaml",
-                        "    interval: 86400",
-                        "```",
-                        "",
-                    ]
-                )
-
-    lines.extend(["## External URLs", ""])
-
-    for filename in sorted_files:
-        rel_path = f"{base_path}/{filename}"
-        lines.extend(
-            [
-                f"### {filename}",
-                "",
-                f"- raw.githubusercontent.com: https://raw.githubusercontent.com/{GITHUB_REPO}/{PUBLISH_BRANCH}/{rel_path}",
-                f"- cdn.jsdelivr.net: https://cdn.jsdelivr.net/gh/{GITHUB_REPO}@{PUBLISH_BRANCH}/{rel_path}",
-                f"- fastly.jsdelivr.net: https://fastly.jsdelivr.net/gh/{GITHUB_REPO}@{PUBLISH_BRANCH}/{rel_path}",
-                f"- testingcf.jsdelivr.net: https://testingcf.jsdelivr.net/gh/{GITHUB_REPO}@{PUBLISH_BRANCH}/{rel_path}",
-                f"- gh-proxy: https://gh-proxy.org/https://github.com/{GITHUB_REPO}/blob/{PUBLISH_BRANCH}/{rel_path}",
-                "",
-            ]
-        )
-
-    readme_path = output_path(target, rule_type, "README.MD")
-    readme_path.parent.mkdir(parents=True, exist_ok=True)
-    readme_path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
-
-
-def to_domainset_entry(target: str, rule: Rule) -> str | None:
-    if rule.kind == "DOMAIN":
-        return rule.value
-
-    if rule.kind == "DOMAIN-SUFFIX":
-        prefix = "+." if target == "mihomo" else "."
-        return f"{prefix}{rule.value}"
-
-    if rule.kind == "DOMAIN-WILDCARD":
-        if rule.value.startswith("*."):
-            suffix = rule.value[2:]
-            prefix = "+." if target == "mihomo" else "."
-            return f"{prefix}{suffix}"
-        return None
-
-    return None
-
-
-def domainset_entries_for_target(target: str, rules: list[Rule]) -> list[str]:
-    entries: list[str] = []
-    for rule in rules:
-        entry = to_domainset_entry(target, rule)
-        if entry:
-            entries.append(entry)
-    return dedupe_sort_strings(entries)
-
-
-def to_mihomo_payload(rules: list[Rule]) -> dict:
-    return {"payload": [rule.as_line for rule in rules]}
-
-
-def to_sing_box_rules(rules: list[Rule]) -> dict:
-    mapped: list[dict] = []
-
-    def wildcard_to_regex(pattern: str) -> str:
-        escaped = re.escape(pattern)
-        return "^" + escaped.replace(r"\*", ".*") + "$"
-
-    def append_rule(key: str, value: str) -> None:
-        if mapped and key in mapped[-1]:
-            mapped[-1][key].append(value)
-        else:
-            mapped.append({key: [value]})
-
-    for rule in rules:
-        if rule.kind == "DOMAIN":
-            append_rule("domain", rule.value)
-        elif rule.kind == "DOMAIN-SUFFIX":
-            append_rule("domain_suffix", rule.value)
-        elif rule.kind == "DOMAIN-KEYWORD":
-            append_rule("domain_keyword", rule.value)
-        elif rule.kind == "DOMAIN-REGEX":
-            append_rule("domain_regex", rule.value)
-        elif rule.kind == "DOMAIN-WILDCARD":
-            append_rule("domain_regex", wildcard_to_regex(rule.value))
-        elif rule.kind in {"IP-CIDR", "IP-CIDR6"}:
-            append_rule("ip_cidr", rule.value)
-        elif rule.kind == "URL-REGEX":
-            append_rule("domain_regex", rule.value)
-
-    return {
-        "version": 1,
-        "rules": mapped,
-    }
-
-
-def compile_sing_box(source_json: Path, out_srs: Path) -> None:
-    binary = shutil.which("sing-box")
-    if not binary:
-        raise RuntimeError("sing-box binary not found in PATH; cannot compile .srs")
-    out_srs.parent.mkdir(parents=True, exist_ok=True)
-    subprocess.run([binary, "rule-set", "compile", "--output", str(out_srs), str(source_json)], check=True)
-
-
-class TargetEmitter(ABC):
-    target: str
-
-    @abstractmethod
-    def emit_bundle(self, bundle: Bundle, raw_rules: list[Rule], generated_at: str, compile_srs: bool) -> dict[str, list[str]]:
-        raise NotImplementedError
-
-
-class ClassicalTargetEmitter(TargetEmitter):
-    def __init__(self, target: str) -> None:
-        self.target = target
-
-    def emit_bundle(self, bundle: Bundle, raw_rules: list[Rule], generated_at: str, compile_srs: bool) -> dict[str, list[str]]:
-        del compile_srs
-        emitted: dict[str, list[str]] = {}
-
-        mapped = map_rules_for_target(self.target, raw_rules)
-        groups = split_rules(mapped)
-
-        if write_lines_with_header(
-            output_path(self.target, "domains", f"{bundle.name}.list"),
-            domainset_entries_for_target(self.target, groups.domain),
-            generated_at,
-        ):
-            emitted.setdefault("domains", []).append(f"{bundle.name}.list")
-        if write_lines_with_header(
-            output_path(self.target, "endpoints", f"{bundle.name}.conf"),
-            [rule.as_line for rule in groups.endpoint],
-            generated_at,
-        ):
-            emitted.setdefault("endpoints", []).append(f"{bundle.name}.conf")
-        if write_lines_with_header(
-            output_path(self.target, "origins", f"{bundle.name}.conf"),
-            [rule.as_line for rule in groups.origins],
-            generated_at,
-        ):
-            emitted.setdefault("origins", []).append(f"{bundle.name}.conf")
-
-        return emitted
-
-
-class MihomoTargetEmitter(TargetEmitter):
-    target = "mihomo"
-
-    def emit_bundle(self, bundle: Bundle, raw_rules: list[Rule], generated_at: str, compile_srs: bool) -> dict[str, list[str]]:
-        del compile_srs
-        emitted: dict[str, list[str]] = {}
-
-        mapped = map_rules_for_target(self.target, raw_rules)
-        groups = split_rules(mapped)
-
-        if write_lines_with_header(
-            output_path(self.target, "domains", f"{bundle.name}.list"),
-            domainset_entries_for_target(self.target, groups.domain),
-            generated_at,
-        ):
-            emitted.setdefault("domains", []).append(f"{bundle.name}.list")
-
-        if groups.endpoint:
-            out = output_path(self.target, "endpoints", f"{bundle.name}.yaml")
-            write_yaml_with_header(out, to_mihomo_payload(groups.endpoint), len(groups.endpoint), generated_at)
-            emitted.setdefault("endpoints", []).append(f"{bundle.name}.yaml")
-
-        if groups.origins:
-            out = output_path(self.target, "origins", f"{bundle.name}.yaml")
-            write_yaml_with_header(out, to_mihomo_payload(groups.origins), len(groups.origins), generated_at)
-            emitted.setdefault("origins", []).append(f"{bundle.name}.yaml")
-
-        return emitted
-
-
-class SingBoxTargetEmitter(TargetEmitter):
-    target = "sing-box"
-
-    def emit_bundle(self, bundle: Bundle, raw_rules: list[Rule], generated_at: str, compile_srs: bool) -> dict[str, list[str]]:
-        del generated_at
-        emitted: dict[str, list[str]] = {}
-
-        mapped = map_rules_for_target(self.target, raw_rules)
-        groups = split_rules(mapped)
-        rules = [*groups.domain, *groups.endpoint, *groups.origins]
-
-        if not rules:
-            return emitted
-
-        rules_json = output_path(self.target, "json", f"{bundle.name}.json")
-        rules_json.parent.mkdir(parents=True, exist_ok=True)
-        rules_json.write_text(
-            json.dumps(to_sing_box_rules(rules), ensure_ascii=False, indent=2) + "\n",
-            encoding="utf-8",
-        )
-        emitted.setdefault("json", []).append(f"{bundle.name}.json")
-
-        if compile_srs:
-            compile_sing_box(rules_json, output_path(self.target, "srs", f"{bundle.name}.srs"))
-            emitted.setdefault("srs", []).append(f"{bundle.name}.srs")
-
-        return emitted
-
-
-def build_target_emitters() -> list[TargetEmitter]:
-    return [
-        ClassicalTargetEmitter("surge"),
-        MihomoTargetEmitter(),
-        ClassicalTargetEmitter("shadowrocket"),
-        ClassicalTargetEmitter("loon"),
-        SingBoxTargetEmitter(),
-    ]
-
-
-def emit_one(bundle: Bundle, raw_rules: list[Rule], compile_srs: bool, generated_at: str) -> dict[str, dict[str, list[str]]]:
-    generated_files: dict[str, dict[str, list[str]]] = {target: {} for target in TARGETS}
-
-    for emitter in build_target_emitters():
-        emitted = emitter.emit_bundle(bundle, raw_rules, generated_at=generated_at, compile_srs=compile_srs)
-        if emitted:
-            generated_files[emitter.target] = emitted
-
-    return generated_files
-
-
-def iter_sources() -> list[Bundle]:
-    conf_sources: dict[str, Path] = {}
-    py_sources: dict[str, Path] = {}
-
-    for source in sorted(SOURCE_ROOT.glob("*.conf")):
-        if source.name.startswith("."):
-            continue
-        conf_sources[source.stem] = source
-
-    for source in sorted(SOURCE_ROOT.glob("*.py")):
-        if source.name.startswith("."):
-            continue
-        py_sources[source.stem] = source
-
-    entries: list[Bundle] = []
-    all_names = sorted(set(conf_sources) | set(py_sources))
-    for name in all_names:
-        has_conf = name in conf_sources
-        has_py = name in py_sources
-
-        if has_conf and has_py:
-            entries.append(Bundle(name=name, source=conf_sources[name], source_type="conflict"))
-        elif has_py:
-            entries.append(Bundle(name=name, source=py_sources[name], source_type="py"))
-        else:
-            entries.append(Bundle(name=name, source=conf_sources[name], source_type="conf"))
-
-    return entries
-
-
-def load_rules(bundle: Bundle) -> list[Rule]:
-    if bundle.source_type == "conflict":
-        raise RuntimeError(
-            f"Conflicting sources for '{bundle.name}': both {bundle.name}.conf and {bundle.name}.py exist"
-        )
-    if bundle.source_type == "py":
-        return parse_python_file(bundle.source)
-    return parse_file(bundle.source)
-
-
-def write_manifest(entries: list[tuple[Bundle, list[Rule]]], failures: list[GenerationFailure]) -> None:
-    def source_ref(source: Path) -> str:
-        try:
-            return str(source.relative_to(ROOT))
-        except ValueError:
-            raw = str(source)
-            return raw.replace("https:/", "https://", 1).replace("http:/", "http://", 1)
-
-    manifest = {
-        "single_source_of_truth": "src/*.conf + src/*.py (non-hidden)",
-        "ruleset_baseline": RULESET_BASELINE,
-        "sources": [
-            {
-                "name": bundle.name,
-                "source": source_ref(bundle.source),
-                "rule_count": len(rules),
-                "group_count": {
-                    "domain": len(split_rules(rules).domain),
-                    "endpoint": len(split_rules(rules).endpoint),
-                    "origins": len(split_rules(rules).origins),
-                },
-            }
-            for bundle, rules in entries
-        ],
-        "targets": TARGETS,
-        "failures": [{"name": item.name, "reason": item.reason} for item in failures],
-    }
-    out = OUTPUT_ROOT / "manifest.json"
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+DEFAULT_TARGETS = ("surge", "mihomo", "shadowrocket", "loon", "sing-box")
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Generate multi-client rules from src/*.conf and src/*.py")
+    parser = argparse.ArgumentParser(description="Generate multi-client rules from platform-neutral source rules")
+    parser.add_argument(
+        "--source-root",
+        required=True,
+        help="Source directory containing *.conf and *.py rule definitions",
+    )
+    parser.add_argument(
+        "--output-root",
+        required=True,
+        help="Output directory for generated rule artifacts",
+    )
+    parser.add_argument(
+        "--ruleset-baseline",
+        required=True,
+        help="Baseline target name stored in manifest metadata",
+    )
+    parser.add_argument(
+        "--targets",
+        default=",".join(DEFAULT_TARGETS),
+        help="Comma-separated target list, defaults to all targets",
+    )
+    parser.add_argument(
+        "--github-repo",
+        required=True,
+        help="GitHub repository in owner/name format for README external links",
+    )
+    parser.add_argument(
+        "--publish-branch",
+        required=True,
+        help="Publish branch name used in README external links",
+    )
     parser.add_argument(
         "--skip-sing-box-compile",
         action="store_true",
@@ -622,35 +50,33 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def main() -> None:
-    args = parse_args()
+def build_config(args: argparse.Namespace) -> GeneratorConfig:
+    targets = tuple(part.strip() for part in args.targets.split(",") if part.strip())
+    if not targets:
+        raise RuntimeError("At least one target must be specified via --targets")
+
+    source_root = Path(args.source_root).expanduser().resolve()
+    output_root = Path(args.output_root).expanduser().resolve()
+
+    if not source_root.exists() or not source_root.is_dir():
+        raise RuntimeError(f"--source-root does not exist or is not a directory: {source_root}")
+
     generated_at = datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
-    if OUTPUT_ROOT.exists():
-        shutil.rmtree(OUTPUT_ROOT)
-    bundles = iter_sources()
-    entries: list[tuple[Bundle, list[Rule]]] = []
-    failures: list[GenerationFailure] = []
-    readme_index: dict[str, dict[str, list[str]]] = {target: {} for target in TARGETS}
-    for bundle in bundles:
-        try:
-            rules = load_rules(bundle)
-            file_map = emit_one(bundle, rules, compile_srs=not args.skip_sing_box_compile, generated_at=generated_at)
-            entries.append((bundle, rules))
-            for target, types in file_map.items():
-                for rule_type, filenames in types.items():
-                    if rule_type not in readme_index[target]:
-                        readme_index[target][rule_type] = []
-                    readme_index[target][rule_type].extend(filenames)
-        except Exception as exc:
-            failures.append(GenerationFailure(name=bundle.name, reason=str(exc)))
-            print(f"[WARN] Failed to generate '{bundle.name}': {exc}. Keep previous published version.")
+    return GeneratorConfig(
+        source_root=source_root,
+        output_root=output_root,
+        ruleset_baseline=args.ruleset_baseline,
+        targets=targets,
+        github_repo=args.github_repo,
+        publish_branch=args.publish_branch,
+        compile_srs=not args.skip_sing_box_compile,
+        generated_at=generated_at,
+    )
 
-    for target, types in readme_index.items():
-        for rule_type, filenames in types.items():
-            write_type_readme(target, rule_type, filenames)
 
-    write_manifest(entries, failures)
-    print(f"Generated {len(entries)} rule bundles.")
+def main() -> None:
+    config = build_config(parse_args())
+    run_generation(config)
 
 
 if __name__ == "__main__":

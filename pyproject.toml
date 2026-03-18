@@ -2,7 +2,7 @@
 name = "ruleset-generator"
 version = "0.1.0"
 description = "Generate Surge/Mihomo/Shadowrocket/Loon/sing-box rules from platform-agnostic sources"
-readme = "README.md"
+readme = "AGENTS.md"
 requires-python = ">=3.11"
 dependencies = [
   "PyYAML>=6.0",
