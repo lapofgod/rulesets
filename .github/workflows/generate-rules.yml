@@ -33,15 +33,24 @@ jobs:
           path: cache
           key: rulesets-runtime-cache-${{ runner.os }}-v1
 
-      - name: Setup Go
-        uses: actions/setup-go@v5
+      - name: Cache sing-box
+        uses: actions/cache@v4
         with:
-          go-version: "stable"
+          path: |
+            ${{ runner.temp }}/sing-box
+          key: sing-box-${{ runner.os }}-v1
 
       - name: Install sing-box
         run: |
-          go install github.com/sagernet/sing-box/cmd/sing-box@latest
-          echo "$HOME/go/bin" >> "$GITHUB_PATH"
+          INSTALL_DIR="${{ runner.temp }}/sing-box"
+          mkdir -p "$INSTALL_DIR"
+          
+          if [ ! -f "$INSTALL_DIR/sing-box" ]; then
+            cd "$INSTALL_DIR"
+            curl -fsSL "https://github.com/sagernet/sing-box/releases/download/v1.9.1/sing-box-1.9.1-linux-amd64.tar.gz" | tar xz
+          fi
+          
+          echo "$INSTALL_DIR" >> "$GITHUB_PATH"
 
       - name: Create venv
         run: uv venv .venv
@@ -64,6 +73,7 @@ jobs:
             --publish-branch "$TARGET_BRANCH"
 
       - name: Commit and push
+        id: publish
         env:
           TARGET_BRANCH: generated
         run: |
@@ -133,17 +143,82 @@ jobs:
           !sing-box/**
           EOF
 
-          # Remove accidentally tracked cache files from previous runs.
-          git rm -r --cached --ignore-unmatch src/__pycache__ || true
-          git rm -r --cached --ignore-unmatch cache || true
-          find . -type d -name "__pycache__" -prune -exec rm -rf {} +
-
           git add -A .
 
           if git diff --staged --quiet; then
             echo "No changes to commit."
+            echo "pushed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
           git commit -m "chore: auto-generate rules"
           git push origin HEAD:"$TARGET_BRANCH"
+          echo "pushed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Purge jsDelivr cache
+        if: steps.publish.outputs.pushed == 'true'
+        env:
+          TARGET_BRANCH: generated
+        run: |
+          set -euo pipefail
+
+          BASE_URL="https://purge.jsdelivr.net/gh/${{ github.repository }}@${TARGET_BRANCH}"
+
+          # Purge only published artifacts and docs to avoid unnecessary requests.
+          mapfile -t FILES < <(
+            git ls-files \
+              '*.list' \
+              '*.conf' \
+              '*.yaml' \
+              '*.json' \
+              '*.srs' \
+              'README.MD' \
+              '*/README.MD' \
+              'manifest.json' \
+              '.gitignore'
+          )
+
+          if [ "${#FILES[@]}" -eq 0 ]; then
+            echo "No published files found, skip jsDelivr purge."
+            exit 0
+          fi
+
+          failed=0
+          for file in "${FILES[@]}"; do
+            url="${BASE_URL}/${file}"
+            attempt=1
+            max_attempts=5
+
+            while [ "$attempt" -le "$max_attempts" ]; do
+              code="$(curl -sS -o /tmp/jsdelivr_purge_resp.txt -w '%{http_code}' "$url" || true)"
+
+              if [ "$code" = "200" ] || [ "$code" = "201" ] || [ "$code" = "202" ] || [ "$code" = "204" ]; then
+                echo "[PURGED] $url (HTTP $code)"
+                break
+              fi
+
+              if [ "$code" = "429" ] || [[ "$code" =~ ^5[0-9][0-9]$ ]]; then
+                backoff=$((attempt * 2))
+                echo "[RETRY] $url (HTTP $code), sleeping ${backoff}s before retry ${attempt}/${max_attempts}"
+                sleep "$backoff"
+                attempt=$((attempt + 1))
+                continue
+              fi
+
+              echo "[WARN] Purge failed for $url (HTTP ${code:-curl_error})"
+              failed=$((failed + 1))
+              break
+            done
+
+            if [ "$attempt" -gt "$max_attempts" ]; then
+              echo "[WARN] Purge exhausted retries for $url"
+              failed=$((failed + 1))
+            fi
+
+            # Throttle requests to reduce risk of rate-limiting.
+            sleep 1
+          done
+
+          if [ "$failed" -gt 0 ]; then
+            echo "[WARN] jsDelivr purge finished with $failed exhausted entries."
+          fi

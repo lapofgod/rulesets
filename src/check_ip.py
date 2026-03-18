@@ -39,7 +39,7 @@ STATIC_LINES = [
 ]
 
 
-def normalize_domain_from_host(host: str) -> str | None:
+def _normalize_domain_from_host(host: str) -> str | None:
     host = host.strip().lower().strip(".")
     if not host:
         return None
@@ -56,12 +56,12 @@ def normalize_domain_from_host(host: str) -> str | None:
     return host
 
 
-def is_cn_location(loc: str) -> bool:
+def _is_cn_location(loc: str) -> bool:
     upper = loc.upper()
     return bool(re.search(r"\bCN\b", upper) or "CHINA" in upper)
 
 
-def dynamic_mirror_lines() -> list[str]:
+def _dynamic_mirror_lines() -> list[str]:
     payload_text, from_cache = fetch_text_with_retry_cache(
         url=TEST_IPV6_SITES_JSON_URL,
     )
@@ -79,10 +79,10 @@ def dynamic_mirror_lines() -> list[str]:
             continue
         if not bool(item.get("mirror")):
             continue
-        if is_cn_location(str(item.get("loc", ""))):
+        if _is_cn_location(str(item.get("loc", ""))):
             continue
 
-        domain = normalize_domain_from_host(str(item.get("site", "")))
+        domain = _normalize_domain_from_host(str(item.get("site", "")))
         if domain:
             domains.add(domain)
 
@@ -92,7 +92,7 @@ def dynamic_mirror_lines() -> list[str]:
     return [f"DOMAIN-SUFFIX,{domain}" for domain in sorted_domains]
 
 
-def dedupe_lines_keep_order(lines: list[str]) -> list[str]:
+def _dedupe_lines_keep_order(lines: list[str]) -> list[str]:
     deduped: list[str] = []
     seen: set[str] = set()
     for line in lines:
@@ -106,8 +106,8 @@ def dedupe_lines_keep_order(lines: list[str]) -> list[str]:
 def generate_conf_lines() -> list[str]:
     lines = list(STATIC_LINES)
     try:
-        lines.extend(dynamic_mirror_lines())
+        lines.extend(_dynamic_mirror_lines())
     except Exception as exc:
         # Keep static fallback output when dynamic fetch/cache fails.
         print(f"[WARN] check_ip.py dynamic mirrors skipped: {exc}")
-    return dedupe_lines_keep_order(lines)
+    return _dedupe_lines_keep_order(lines)

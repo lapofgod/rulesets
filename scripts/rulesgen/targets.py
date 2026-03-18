@@ -8,7 +8,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Iterable, Sequence
 
-from .models import DOMAINSET_KINDS, ORIGIN_KINDS, EmitContext, GenericRuleSet, Rule, RuleGroups
+from .models import DOMAINSET_KINDS, LOGICAL_KINDS, ORIGIN_KINDS, EmitContext, GenericRuleSet, Rule, RuleGroups
 from .writers import output_path, write_lines_with_header, write_yaml_with_header
 
 
@@ -16,43 +16,7 @@ def dedupe_sort_strings(items: Iterable[str]) -> list[str]:
     return sorted(set(items))
 
 
-def map_rule_for_target(target: str, rule: Rule) -> Rule | None:
-    kind = rule.kind
-    value = rule.value
-    extras = rule.extras
-
-    if kind == "DST-PORT" and target in {"surge", "shadowrocket"}:
-        kind = "DEST-PORT"
-
-    if kind == "DOMAIN-WILDCARD":
-        if target == "loon":
-            if value.startswith("*."):
-                return Rule("DOMAIN-SUFFIX", value[2:], extras)
-            return None
-        if target == "sing-box":
-            if value.startswith("*."):
-                return Rule("DOMAIN-SUFFIX", value[2:], extras)
-            return Rule("DOMAIN-WILDCARD", value, extras)
-
-    if kind == "USER-AGENT" and target in {"mihomo", "sing-box"}:
-        return None
-
-    if kind == "URL-REGEX" and target in {"mihomo", "sing-box"}:
-        return None
-
-    return Rule(kind, value, extras)
-
-
-def map_rules_for_target(target: str, rules: list[Rule]) -> list[Rule]:
-    mapped: list[Rule] = []
-    for rule in rules:
-        converted = map_rule_for_target(target, rule)
-        if converted is not None:
-            mapped.append(converted)
-    return mapped
-
-
-def split_rules(rules: list[Rule]) -> RuleGroups:
+def split_rules_default(rules: list[Rule]) -> RuleGroups:
     domain: list[Rule] = []
     endpoint: list[Rule] = []
     origins: list[Rule] = []
@@ -68,28 +32,50 @@ def split_rules(rules: list[Rule]) -> RuleGroups:
     return RuleGroups(domain=domain, endpoint=endpoint, origins=origins)
 
 
-def to_domainset_entry(target: str, rule: Rule) -> str | None:
+def to_domainset_entry_non_mihomo(rule: Rule) -> str | None:
     if rule.kind == "DOMAIN":
         return rule.value
 
     if rule.kind == "DOMAIN-SUFFIX":
-        prefix = "+." if target == "mihomo" else "."
-        return f"{prefix}{rule.value}"
+        return f".{rule.value}"
 
     if rule.kind == "DOMAIN-WILDCARD":
         if rule.value.startswith("*."):
             suffix = rule.value[2:]
-            prefix = "+." if target == "mihomo" else "."
-            return f"{prefix}{suffix}"
+            return f".{suffix}"
         return None
 
     return None
 
 
-def domainset_entries_for_target(target: str, rules: list[Rule]) -> list[str]:
+def domainset_entries_non_mihomo(rules: list[Rule]) -> list[str]:
     entries: list[str] = []
     for rule in rules:
-        entry = to_domainset_entry(target, rule)
+        entry = to_domainset_entry_non_mihomo(rule)
+        if entry:
+            entries.append(entry)
+    return dedupe_sort_strings(entries)
+
+
+def to_domainset_entry_mihomo(rule: Rule) -> str | None:
+    if rule.kind == "DOMAIN":
+        return rule.value
+
+    if rule.kind == "DOMAIN-SUFFIX":
+        return f"+.{rule.value}"
+
+    if rule.kind == "DOMAIN-WILDCARD":
+        if rule.value.startswith("*."):
+            return f"+.{rule.value[2:]}"
+        return None
+
+    return None
+
+
+def domainset_entries_mihomo(rules: list[Rule]) -> list[str]:
+    entries: list[str] = []
+    for rule in rules:
+        entry = to_domainset_entry_mihomo(rule)
         if entry:
             entries.append(entry)
     return dedupe_sort_strings(entries)
@@ -99,36 +85,104 @@ def to_mihomo_payload(rules: list[Rule]) -> dict:
     return {"payload": [rule.as_line for rule in rules]}
 
 
-def to_sing_box_rules(rules: list[Rule]) -> dict:
-    mapped: list[dict] = []
-
+def to_sing_box_rule(rule: Rule) -> tuple[dict | None, str | None]:
     def wildcard_to_regex(pattern: str) -> str:
         escaped = re.escape(pattern)
-        return "^" + escaped.replace(r"\*", ".*") + "$"
+        return "^" + escaped.replace(r"\*", ".*").replace(r"\?", ".") + "$"
 
-    def append_rule(key: str, value: str) -> None:
-        if mapped and key in mapped[-1]:
-            mapped[-1][key].append(value)
-        else:
-            mapped.append({key: [value]})
+    def parse_port_value(raw: str, *, source: bool) -> tuple[dict | None, str | None]:
+        value = raw.strip()
+        if re.fullmatch(r"\d+", value):
+            key = "source_port" if source else "port"
+            return {key: [int(value)]}, None
+
+        normalized = value.replace("-", ":")
+        if re.fullmatch(r"\d+:\d+|:\d+|\d+:", normalized):
+            key = "source_port_range" if source else "port_range"
+            return {key: [normalized]}, None
+
+        return None, f"Unsupported port expression for sing-box: '{raw}'"
+
+    if rule.kind == "AND":
+        if not rule.logical_children:
+            return None, "Invalid AND rule for sing-box: missing parsed children"
+        children: list[dict] = []
+        for child in rule.logical_children:
+            converted, warning = to_sing_box_rule(child)
+            if warning:
+                return None, warning
+            if converted is None:
+                return None, "Invalid AND rule for sing-box: empty child"
+            children.append(converted)
+        return {"type": "logical", "mode": "and", "rules": children}, None
+
+    if rule.kind == "OR":
+        if not rule.logical_children:
+            return None, "Invalid OR rule for sing-box: missing parsed children"
+        children: list[dict] = []
+        for child in rule.logical_children:
+            converted, warning = to_sing_box_rule(child)
+            if warning:
+                return None, warning
+            if converted is None:
+                return None, "Invalid OR rule for sing-box: empty child"
+            children.append(converted)
+        return {"type": "logical", "mode": "or", "rules": children}, None
+
+    if rule.kind == "NOT":
+        if len(rule.logical_children) != 1:
+            return None, "Invalid NOT rule for sing-box: exactly one child is required"
+
+        converted, warning = to_sing_box_rule(rule.logical_children[0])
+        if warning:
+            return None, warning
+        if converted is None:
+            return None, "Invalid NOT rule for sing-box: empty child"
+
+        toggled = dict(converted)
+        toggled["invert"] = not bool(toggled.get("invert", False))
+        return toggled, None
+
+    if rule.kind == "DOMAIN":
+        return {"domain": [rule.value]}, None
+    if rule.kind == "DOMAIN-SUFFIX":
+        return {"domain_suffix": [rule.value]}, None
+    if rule.kind == "DOMAIN-KEYWORD":
+        return {"domain_keyword": [rule.value]}, None
+    if rule.kind == "DOMAIN-REGEX":
+        return {"domain_regex": [rule.value]}, None
+    if rule.kind == "DOMAIN-WILDCARD":
+        return {"domain_regex": [wildcard_to_regex(rule.value)]}, None
+    if rule.kind in {"IP-CIDR", "IP-CIDR6"}:
+        return {"ip_cidr": [rule.value]}, None
+    if rule.kind == "GEOIP":
+        return {"geoip": [rule.value.lower()]}, None
+    if rule.kind == "DST-PORT":
+        return parse_port_value(rule.value, source=False)
+    if rule.kind == "SRC-PORT":
+        return parse_port_value(rule.value, source=True)
+
+    if rule.kind in {"URL-REGEX", "USER-AGENT"}:
+        return None, f"Rule kind '{rule.kind}' is not supported by sing-box rule-set source format"
+
+    if rule.kind == "IP-ASN":
+        return None, "Rule kind 'IP-ASN' is not supported by sing-box rule-set source format"
+
+    return None, f"Rule kind '{rule.kind}' is not supported by sing-box conversion"
+
+
+def to_sing_box_rules(rules: list[Rule]) -> tuple[dict, list[str]]:
+    mapped: list[dict] = []
+    warnings: list[str] = []
 
     for rule in rules:
-        if rule.kind == "DOMAIN":
-            append_rule("domain", rule.value)
-        elif rule.kind == "DOMAIN-SUFFIX":
-            append_rule("domain_suffix", rule.value)
-        elif rule.kind == "DOMAIN-KEYWORD":
-            append_rule("domain_keyword", rule.value)
-        elif rule.kind == "DOMAIN-REGEX":
-            append_rule("domain_regex", rule.value)
-        elif rule.kind == "DOMAIN-WILDCARD":
-            append_rule("domain_regex", wildcard_to_regex(rule.value))
-        elif rule.kind in {"IP-CIDR", "IP-CIDR6"}:
-            append_rule("ip_cidr", rule.value)
-    return {
-        "version": 1,
-        "rules": mapped,
-    }
+        converted, warning = to_sing_box_rule(rule)
+        if warning:
+            warnings.append(warning)
+        if converted is not None:
+            mapped.append(converted)
+
+    return {"version": 1, "rules": mapped}, warnings
 
 
 def compile_sing_box(source_json: Path, out_srs: Path) -> None:
@@ -148,18 +202,46 @@ class TargetEmitter(ABC):
 
 
 class ClassicalTargetEmitter(TargetEmitter):
-    def __init__(self, target: str) -> None:
-        self.target = target
+    target: str
+
+    def map_rule_leaf(self, rule: Rule) -> Rule | None:
+        return rule
+
+    def map_rule(self, rule: Rule) -> Rule | None:
+        if rule.kind in LOGICAL_KINDS:
+            mapped_children: list[Rule] = []
+            for child in rule.logical_children:
+                mapped_child = self.map_rule(child)
+                if mapped_child is None:
+                    return None
+                mapped_children.append(mapped_child)
+            return Rule(
+                kind=rule.kind,
+                value=rule.value,
+                extras=rule.extras,
+                logical_children=tuple(mapped_children),
+            )
+        return self.map_rule_leaf(rule)
+
+    def split_rules(self, rules: list[Rule]) -> RuleGroups:
+        return split_rules_default(rules)
+
+    def domain_entries(self, rules: list[Rule]) -> list[str]:
+        return domainset_entries_non_mihomo(rules)
 
     def emit_bundle(self, ruleset: GenericRuleSet, context: EmitContext) -> dict[str, list[str]]:
         emitted: dict[str, list[str]] = {}
 
-        mapped = map_rules_for_target(self.target, ruleset.rules)
-        groups = split_rules(mapped)
+        mapped: list[Rule] = []
+        for rule in ruleset.rules:
+            converted = self.map_rule(rule)
+            if converted is not None:
+                mapped.append(converted)
+        groups = self.split_rules(mapped)
 
         if write_lines_with_header(
             output_path(context.output_root, self.target, "domains", f"{ruleset.bundle.name}.list"),
-            domainset_entries_for_target(self.target, groups.domain),
+            self.domain_entries(groups.domain),
             context.generated_at,
         ):
             emitted.setdefault("domains", []).append(f"{ruleset.bundle.name}.list")
@@ -179,18 +261,72 @@ class ClassicalTargetEmitter(TargetEmitter):
         return emitted
 
 
+class SurgeTargetEmitter(ClassicalTargetEmitter):
+    target = "surge"
+
+    def map_rule_leaf(self, rule: Rule) -> Rule | None:
+        if rule.kind == "DST-PORT":
+            return Rule("DEST-PORT", rule.value, rule.extras)
+        return rule
+
+
+class ShadowrocketTargetEmitter(ClassicalTargetEmitter):
+    target = "shadowrocket"
+
+
+class LoonTargetEmitter(ClassicalTargetEmitter):
+    target = "loon"
+
+    def map_rule_leaf(self, rule: Rule) -> Rule | None:
+        if rule.kind == "DST-PORT":
+            return Rule("DEST-PORT", rule.value, rule.extras)
+        if rule.kind != "DOMAIN-WILDCARD":
+            return rule
+        if rule.value.startswith("*."):
+            return Rule("DOMAIN-SUFFIX", rule.value[2:], rule.extras)
+        return None
+
+
 class MihomoTargetEmitter(TargetEmitter):
     target = "mihomo"
+
+    def map_rule_leaf(self, rule: Rule) -> Rule | None:
+        if rule.kind in {"USER-AGENT", "URL-REGEX"}:
+            return None
+        return rule
+
+    def map_rule(self, rule: Rule) -> Rule | None:
+        if rule.kind in LOGICAL_KINDS:
+            mapped_children: list[Rule] = []
+            for child in rule.logical_children:
+                mapped_child = self.map_rule(child)
+                if mapped_child is None:
+                    return None
+                mapped_children.append(mapped_child)
+            return Rule(
+                kind=rule.kind,
+                value=rule.value,
+                extras=rule.extras,
+                logical_children=tuple(mapped_children),
+            )
+        return self.map_rule_leaf(rule)
+
+    def split_rules(self, rules: list[Rule]) -> RuleGroups:
+        return split_rules_default(rules)
 
     def emit_bundle(self, ruleset: GenericRuleSet, context: EmitContext) -> dict[str, list[str]]:
         emitted: dict[str, list[str]] = {}
 
-        mapped = map_rules_for_target(self.target, ruleset.rules)
-        groups = split_rules(mapped)
+        mapped: list[Rule] = []
+        for rule in ruleset.rules:
+            converted = self.map_rule(rule)
+            if converted is not None:
+                mapped.append(converted)
+        groups = self.split_rules(mapped)
 
         if write_lines_with_header(
             output_path(context.output_root, self.target, "domains", f"{ruleset.bundle.name}.list"),
-            domainset_entries_for_target(self.target, groups.domain),
+            domainset_entries_mihomo(groups.domain),
             context.generated_at,
         ):
             emitted.setdefault("domains", []).append(f"{ruleset.bundle.name}.list")
@@ -221,20 +357,32 @@ class MihomoTargetEmitter(TargetEmitter):
 class SingBoxTargetEmitter(TargetEmitter):
     target = "sing-box"
 
+    def map_rule(self, rule: Rule) -> Rule | None:
+        return rule
+
     def emit_bundle(self, ruleset: GenericRuleSet, context: EmitContext) -> dict[str, list[str]]:
         emitted: dict[str, list[str]] = {}
 
-        mapped = map_rules_for_target(self.target, ruleset.rules)
-        groups = split_rules(mapped)
-        rules = [*groups.domain, *groups.endpoint, *groups.origins]
+        mapped: list[Rule] = []
+        for rule in ruleset.rules:
+            converted = self.map_rule(rule)
+            if converted is not None:
+                mapped.append(converted)
 
-        if not rules:
+        if not mapped:
+            return emitted
+
+        payload, warnings = to_sing_box_rules(mapped)
+        for warning in warnings:
+            print(f"[WARN] {ruleset.bundle.source.name}: {warning}")
+
+        if not payload.get("rules"):
             return emitted
 
         rules_json = output_path(context.output_root, self.target, "json", f"{ruleset.bundle.name}.json")
         rules_json.parent.mkdir(parents=True, exist_ok=True)
         rules_json.write_text(
-            json.dumps(to_sing_box_rules(rules), ensure_ascii=False, indent=2) + "\n",
+            json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
             encoding="utf-8",
         )
         emitted.setdefault("json", []).append(f"{ruleset.bundle.name}.json")
@@ -251,10 +399,10 @@ class SingBoxTargetEmitter(TargetEmitter):
 
 def build_target_emitters(targets: Sequence[str]) -> list[TargetEmitter]:
     emitter_factories = {
-        "surge": lambda: ClassicalTargetEmitter("surge"),
+        "surge": SurgeTargetEmitter,
         "mihomo": MihomoTargetEmitter,
-        "shadowrocket": lambda: ClassicalTargetEmitter("shadowrocket"),
-        "loon": lambda: ClassicalTargetEmitter("loon"),
+        "shadowrocket": ShadowrocketTargetEmitter,
+        "loon": LoonTargetEmitter,
         "sing-box": SingBoxTargetEmitter,
     }
     emitters: list[TargetEmitter] = []

@@ -9,7 +9,7 @@ from rulesgen.plugin_host import fetch_text_with_retry_cache
 GFWLIST_URL = "https://raw.githubusercontent.com/gfwlist/gfwlist/master/gfwlist.txt"
 
 
-def decode_gfwlist_payload(payload: str) -> str:
+def _decode_gfwlist_payload(payload: str) -> str:
     text = payload.strip()
 
     try:
@@ -21,7 +21,7 @@ def decode_gfwlist_payload(payload: str) -> str:
     return text
 
 
-def normalize_domain_from_host(host: str) -> str | None:
+def _normalize_domain_from_host(host: str) -> str | None:
     host = host.strip().lower().strip(".")
     if not host:
         return None
@@ -38,7 +38,7 @@ def normalize_domain_from_host(host: str) -> str | None:
     return host
 
 
-def parse_gfwlist_domain(line: str) -> str | None:
+def _parse_gfwlist_domain(line: str) -> str | None:
     line = line.strip()
     if not line:
         return None
@@ -51,7 +51,7 @@ def parse_gfwlist_domain(line: str) -> str | None:
         line = line.split("$", 1)[0]
 
     if line.startswith("||"):
-        return normalize_domain_from_host(line[2:])
+        return _normalize_domain_from_host(line[2:])
 
     if line.startswith("|"):
         line = line[1:]
@@ -59,20 +59,20 @@ def parse_gfwlist_domain(line: str) -> str | None:
     if line.startswith("http://") or line.startswith("https://"):
         try:
             host = urllib.parse.urlparse(line).hostname
-            return normalize_domain_from_host(host or "")
+            return _normalize_domain_from_host(host or "")
         except Exception:
             return None
 
     if line.startswith("."):
-        return normalize_domain_from_host(line[1:])
+        return _normalize_domain_from_host(line[1:])
 
     if line.startswith("*."):
-        return normalize_domain_from_host(line[2:])
+        return _normalize_domain_from_host(line[2:])
 
     if any(token in line for token in ["*", "^", "/", "?"]):
         return None
 
-    return normalize_domain_from_host(line)
+    return _normalize_domain_from_host(line)
 
 
 def generate_conf_lines() -> list[str]:
@@ -82,10 +82,10 @@ def generate_conf_lines() -> list[str]:
     )
     if from_cache:
         print("[WARN] gfwlist.py using cached payload")
-    raw = decode_gfwlist_payload(payload)
+    raw = _decode_gfwlist_payload(payload)
 
     for line in raw.splitlines():
-        domain = parse_gfwlist_domain(line)
+        domain = _parse_gfwlist_domain(line)
         if domain:
             domains.add(domain)
 

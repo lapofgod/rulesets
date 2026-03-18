@@ -4,43 +4,122 @@ import importlib.util
 import re
 from pathlib import Path
 
-from .models import Bundle, Rule
+from .models import Bundle, LOGICAL_KINDS, Rule
 from .plugin_host import activate_context
+
+
+BASIC_RULE_KINDS = {
+    "DOMAIN",
+    "DOMAIN-SUFFIX",
+    "DOMAIN-KEYWORD",
+    "DOMAIN-WILDCARD",
+    "DOMAIN-REGEX",
+    "IP-CIDR",
+    "IP-CIDR6",
+    "IP-ASN",
+    "GEOIP",
+    "AND",
+    "OR",
+    "NOT",
+    "URL-REGEX",
+    "USER-AGENT",
+    "SRC-PORT",
+    "DST-PORT",
+}
+
+def _split_top_level_commas(text: str) -> list[str] | None:
+    parts: list[str] = []
+    depth = 0
+    start = 0
+
+    for idx, ch in enumerate(text):
+        if ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth -= 1
+            if depth < 0:
+                return None
+        elif ch == "," and depth == 0:
+            parts.append(text[start:idx].strip())
+            start = idx + 1
+
+    if depth != 0:
+        return None
+
+    parts.append(text[start:].strip())
+    return parts
+
+
+def _parse_rule_content(content: str) -> tuple[Rule | None, str | None]:
+    kind_raw, separator, remainder = content.partition(",")
+    if not separator:
+        return None, None
+
+    kind = normalize_kind(kind_raw)
+
+    if kind not in BASIC_RULE_KINDS:
+        return None, f"Unknown rule kind '{kind}' ignored"
+
+    if kind in LOGICAL_KINDS:
+        expression = remainder.strip()
+        if not expression:
+            return None, f"Invalid {kind} rule ignored: missing expression"
+        if not (expression.startswith("(") and expression.endswith(")")):
+            return None, f"Invalid {kind} rule ignored: malformed expression"
+
+        body = expression[1:-1].strip()
+        if not body:
+            return None, f"Invalid {kind} rule ignored: empty expression"
+
+        items = _split_top_level_commas(body)
+        if items is None:
+            return None, f"Invalid {kind} rule ignored: unbalanced parentheses"
+
+        children: list[Rule] = []
+        for item in items:
+            if not (item.startswith("(") and item.endswith(")")):
+                return None, f"Invalid {kind} rule ignored: each operand must be wrapped by ()"
+
+            child, warning = _parse_rule_content(item[1:-1].strip())
+            if warning:
+                return None, f"Invalid {kind} rule ignored: {warning}"
+            if child is None:
+                return None, f"Invalid {kind} rule ignored: empty operand"
+            children.append(child)
+
+        if kind == "NOT" and len(children) != 1:
+            return None, "Invalid NOT rule ignored: exactly one operand is required"
+
+        return Rule(kind=kind, value=expression, logical_children=tuple(children)), None
+
+    parts = [part.strip() for part in remainder.split(",")]
+    value = parts[0]
+    extras = tuple(parts[1:]) if len(parts) > 1 else ()
+
+    if kind == "DOMAIN-SUFFIX" and value.startswith("."):
+        value = value[1:]
+
+    return Rule(kind, value, extras), None
 
 
 def normalize_kind(kind: str) -> str:
     return kind.strip().upper().replace("_", "-")
 
 
-def parse_conf_line(raw: str) -> Rule | None:
+def parse_conf_line(raw: str) -> tuple[Rule | None, str | None]:
     line = raw.strip()
     line = re.split(r"\s+#", line, maxsplit=1)[0].strip()
     if not line or line.startswith("#"):
-        return None
-
-    if line.startswith("."):
-        return Rule("DOMAIN-SUFFIX", line[1:])
-    if line.startswith("+.") or line.startswith("*."):
-        return Rule("DOMAIN-SUFFIX", line[2:])
-
-    parts = [part.strip() for part in line.split(",")]
-    if len(parts) < 2:
-        return None
-
-    kind = normalize_kind(parts[0])
-    value = parts[1]
-    extras = tuple(parts[2:]) if len(parts) > 2 else ()
-
-    if kind == "DOMAIN-SUFFIX" and value.startswith("."):
-        value = value[1:]
-
-    return Rule(kind, value, extras)
+        return None, None
+    return _parse_rule_content(line)
 
 
 def parse_file(file_path: Path) -> list[Rule]:
     rules: list[Rule] = []
-    for line in file_path.read_text(encoding="utf-8").splitlines():
-        parsed = parse_conf_line(line)
+    for line_no, line in enumerate(file_path.read_text(encoding="utf-8").splitlines(), start=1):
+        parsed, warning = parse_conf_line(line)
+        if warning:
+            print(f"[WARN] {file_path.name}:{line_no}: {warning}")
         if parsed:
             rules.append(parsed)
     return rules
@@ -82,7 +161,9 @@ def parse_python_file(file_path: Path, *, bundle_name: str, cache_root: Path) ->
     for idx, line in enumerate(raw_lines, start=1):
         if not isinstance(line, str):
             raise RuntimeError(f"'{file_path.name}' returned non-string line at index {idx}")
-        parsed = parse_conf_line(line)
+        parsed, warning = parse_conf_line(line)
+        if warning:
+            print(f"[WARN] {file_path.name}:{idx}: {warning}")
         if parsed:
             rules.append(parsed)
 

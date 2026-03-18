@@ -6,6 +6,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 DOMAINSET_KINDS = {"DOMAIN", "DOMAIN-SUFFIX"}
 ORIGIN_KINDS = {"USER-AGENT", "SRC-PORT"}
+LOGICAL_KINDS = {"AND", "OR", "NOT"}
 
 
 @dataclass(frozen=True)
@@ -13,9 +14,13 @@ class Rule:
     kind: str
     value: str
     extras: tuple[str, ...] = ()
+    logical_children: tuple["Rule", ...] = ()
 
     @property
     def as_line(self) -> str:
+        if self.kind in LOGICAL_KINDS and self.logical_children:
+            expression = "(" + ",".join(f"({child.as_line})" for child in self.logical_children) + ")"
+            return ",".join([self.kind, expression, *self.extras])
         return ",".join([self.kind, self.value, *self.extras])
 
 

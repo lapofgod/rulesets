@@ -59,7 +59,9 @@ surge/endpoints/README.MD
 - 规则名使用文件名（去掉扩展名）。
 
 规则源格式：
-- `.conf`：按原有逻辑逐行解析；以 `#` 开头的行视为注释并忽略。
+- `.conf`：按基础规则语法逐行解析；以 `#` 开头的行视为注释并忽略。
+- source 输入不支持 domain set 简写（如 `.example.com`、`+.example.com`、`*.example.com`），应显式写为 `DOMAIN-SUFFIX,example.com` 或其他标准规则行。
+- 遇到不识别的规则类型时：忽略该行并输出 `[WARN]` 警告（包含文件名与行号）。
 - `.py`：必须导出 `generate_conf_lines()`，返回 `str` 或 `iterable[str]`；每行内容与 `.conf` 行格式一致。
 - `.py`：涉及缓存时应使用宿主提供的 API（`rulesgen.plugin_host`），不要在插件内自行拼接或管理 `cache/` 路径。
 
@@ -79,12 +81,21 @@ surge/endpoints/README.MD
 DOMAIN-SUFFIX,example.com
 DOMAIN,api.example.com
 DOMAIN-KEYWORD,foo
+DOMAIN-WILDCARD,*.example.com
+DOMAIN-REGEX,^.*\.example\.com$
 IP-CIDR,1.1.1.0/24,no-resolve
+IP-CIDR6,2400:3200::/32
+IP-ASN,13335
+GEOIP,CN
+AND,((DOMAIN,example.com),(DST-PORT,443))
+OR,((DOMAIN-SUFFIX,example.com),(DOMAIN-KEYWORD,foo))
+NOT,((DOMAIN-REGEX,^ads\\.example\\.com$))
 URL-REGEX,^https?:\/\/example\.com\/api
 USER-AGENT,Curl*
 ```
 
 支持行尾注释，例如：`DOMAIN-SUFFIX,example.com # note`。
+`AND` / `OR` / `NOT` 为特殊语法：首个逗号后的表达式整体解析（允许内部继续包含逗号）。
 
 自动升级规则类型：
 - 可表示为 domain set 的规则拆分到 `domains`。
@@ -93,9 +104,10 @@ USER-AGENT,Curl*
 - sing-box 不拆分上述类型，统一输出到 `json/<服务>.json`。
 
 高级规则支持：
-- `DOMAIN-WILDCARD` / `DOMAIN-REGEX` / `DOMAIN-KEYWORD` 均已支持。
+- 当前 source 仅支持基础规则语法；不在基础语法列表中的类型会被忽略并告警。
+- `DOMAIN-WILDCARD`、`DOMAIN-REGEX`、`IP-ASN`、`GEOIP`、`AND`、`OR`、`NOT` 属于基础语法，仍然支持。
 - 非 sing-box 平台主要落到 `endpoints`（或保留平台可兼容映射）。
-- sing-box 映射到 `domain_regex` / `domain_keyword` 等字段。
+- sing-box 可映射 `domain_keyword` 等字段。
 
 domain set 语义：
 - `domains.list` 文件名不变，但内容按平台语义输出。
@@ -108,7 +120,7 @@ domain set 语义：
 - 除 sing-box 外，所有生成规则文件都带英文注释头，且包含 `Rule count`。
 
 平台差异映射：
-- 域名前缀归一化：`.baidu.com`、`+.baidu.com`、`*.baidu.com` 统一为 `DOMAIN-SUFFIX,baidu.com`。
+- source 输入不接受域名前缀简写（`.baidu.com`、`+.baidu.com`、`*.baidu.com`）；请使用显式规则语法。
 - 端口规则映射：源基准使用 `DST-PORT`，Surge/Shadowrocket 输出为 `DEST-PORT`。
 - Loon 兼容：`DOMAIN-WILDCARD` 若值为 `*.example.com` 则降级为 `DOMAIN-SUFFIX,example.com`，否则跳过。
 - Origin 兼容：`USER-AGENT` 仅在支持的平台输出；`SRC-PORT` 归类到 `origins`。
