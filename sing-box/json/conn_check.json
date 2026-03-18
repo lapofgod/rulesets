@@ -3,24 +3,76 @@
   "rules": [
     {
       "domain_suffix": [
-        "msftncsi.com",
+        "msftncsi.com"
+      ]
+    },
+    {
+      "domain_suffix": [
         "msftconnecttest.com"
       ]
     },
     {
       "domain": [
-        "captive.apple.com",
-        "cp.cloudflare.com",
-        "connectivitycheck.gstatic.com",
-        "nmcheck.gnome.org",
-        "networkcheck.kde.org",
-        "detectportal.firefox.com",
-        "network-test.debian.org",
-        "ping.archlinux.org",
-        "connectivity-check.ubuntu.com",
-        "204.pop-os.org",
-        "edge-http.microsoft.com",
-        "connectivitycheck.gtapheneos.network",
+        "captive.apple.com"
+      ]
+    },
+    {
+      "domain": [
+        "cp.cloudflare.com"
+      ]
+    },
+    {
+      "domain": [
+        "connectivitycheck.gstatic.com"
+      ]
+    },
+    {
+      "domain": [
+        "nmcheck.gnome.org"
+      ]
+    },
+    {
+      "domain": [
+        "networkcheck.kde.org"
+      ]
+    },
+    {
+      "domain": [
+        "detectportal.firefox.com"
+      ]
+    },
+    {
+      "domain": [
+        "network-test.debian.org"
+      ]
+    },
+    {
+      "domain": [
+        "ping.archlinux.org"
+      ]
+    },
+    {
+      "domain": [
+        "connectivity-check.ubuntu.com"
+      ]
+    },
+    {
+      "domain": [
+        "204.pop-os.org"
+      ]
+    },
+    {
+      "domain": [
+        "edge-http.microsoft.com"
+      ]
+    },
+    {
+      "domain": [
+        "connectivitycheck.gtapheneos.network"
+      ]
+    },
+    {
+      "domain": [
         "grapheneos.online"
       ]
     }

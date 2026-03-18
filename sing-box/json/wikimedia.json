@@ -3,27 +3,111 @@
   "rules": [
     {
       "domain_suffix": [
-        "mediawiki.org",
-        "toolforge.org",
-        "w.wiki",
-        "wikibooks.org",
-        "wikidata.org",
-        "wikileaks.org",
-        "wikimedia.org",
-        "wikimediacloud.org",
-        "wikimediafoundation.org",
-        "wikinews.org",
-        "wikipedia.com",
-        "wikipedia.org",
-        "wikiquote.org",
-        "wikisource.org",
-        "wikiversity.org",
-        "wikivoyage.org",
-        "wiktionary.org",
-        "wmcloud.org",
-        "wmflabs.org",
-        "wmfusercontent.org",
-        "wikimedia.com",
+        "mediawiki.org"
+      ]
+    },
+    {
+      "domain_suffix": [
+        "toolforge.org"
+      ]
+    },
+    {
+      "domain_suffix": [
+        "w.wiki"
+      ]
+    },
+    {
+      "domain_suffix": [
+        "wikibooks.org"
+      ]
+    },
+    {
+      "domain_suffix": [
+        "wikidata.org"
+      ]
+    },
+    {
+      "domain_suffix": [
+        "wikileaks.org"
+      ]
+    },
+    {
+      "domain_suffix": [
+        "wikimedia.org"
+      ]
+    },
+    {
+      "domain_suffix": [
+        "wikimediacloud.org"
+      ]
+    },
+    {
+      "domain_suffix": [
+        "wikimediafoundation.org"
+      ]
+    },
+    {
+      "domain_suffix": [
+        "wikinews.org"
+      ]
+    },
+    {
+      "domain_suffix": [
+        "wikipedia.com"
+      ]
+    },
+    {
+      "domain_suffix": [
+        "wikipedia.org"
+      ]
+    },
+    {
+      "domain_suffix": [
+        "wikiquote.org"
+      ]
+    },
+    {
+      "domain_suffix": [
+        "wikisource.org"
+      ]
+    },
+    {
+      "domain_suffix": [
+        "wikiversity.org"
+      ]
+    },
+    {
+      "domain_suffix": [
+        "wikivoyage.org"
+      ]
+    },
+    {
+      "domain_suffix": [
+        "wiktionary.org"
+      ]
+    },
+    {
+      "domain_suffix": [
+        "wmcloud.org"
+      ]
+    },
+    {
+      "domain_suffix": [
+        "wmflabs.org"
+      ]
+    },
+    {
+      "domain_suffix": [
+        "wmfusercontent.org"
+      ]
+    },
+    {
+      "domain_suffix": [
+        "wikimedia.com"
+      ]
+    },
+    {
+      "domain_suffix": [
         "translatewiki.net"
       ]
     }
