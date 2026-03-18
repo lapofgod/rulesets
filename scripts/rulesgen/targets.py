@@ -37,7 +37,7 @@ def map_rule_for_target(target: str, rule: Rule) -> Rule | None:
     if kind == "USER-AGENT" and target in {"mihomo", "sing-box"}:
         return None
 
-    if kind == "URL-REGEX" and target == "mihomo":
+    if kind == "URL-REGEX" and target in {"mihomo", "sing-box"}:
         return None
 
     return Rule(kind, value, extras)
@@ -125,9 +125,6 @@ def to_sing_box_rules(rules: list[Rule]) -> dict:
             append_rule("domain_regex", wildcard_to_regex(rule.value))
         elif rule.kind in {"IP-CIDR", "IP-CIDR6"}:
             append_rule("ip_cidr", rule.value)
-        elif rule.kind == "URL-REGEX":
-            append_rule("domain_regex", rule.value)
-
     return {
         "version": 1,
         "rules": mapped,
