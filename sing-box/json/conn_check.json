@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "rules": [
+    {
+      "domain_suffix": [
+        "msftncsi.com",
+        "msftconnecttest.com"
+      ]
+    },
+    {
+      "domain": [
+        "captive.apple.com",
+        "cp.cloudflare.com",
+        "connectivitycheck.gstatic.com",
+        "nmcheck.gnome.org",
+        "networkcheck.kde.org",
+        "detectportal.firefox.com",
+        "network-test.debian.org",
+        "ping.archlinux.org",
+        "connectivity-check.ubuntu.com",
+        "204.pop-os.org",
+        "edge-http.microsoft.com",
+        "connectivitycheck.gtapheneos.network",
+        "grapheneos.online"
+      ]
+    },
+    {
+      "domain_regex": [
+        "^http://fedoraproject\\.org/static/hotspot\\.txt",
+        "^http://edge\\.microsoft\\.com/captiveportal/generate_204"
+      ]
+    }
+  ]
+}

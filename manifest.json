@@ -1,0 +1,84 @@
+{
+  "single_source_of_truth": "src/*.conf + src/*.py (non-hidden)",
+  "ruleset_baseline": "mihomo",
+  "sources": [
+    {
+      "name": "_personal_reject",
+      "source": "src/_personal_reject.conf",
+      "rule_count": 14,
+      "group_count": {
+        "domain": 1,
+        "endpoint": 13,
+        "origins": 0
+      }
+    },
+    {
+      "name": "audited",
+      "source": "src/audited.conf",
+      "rule_count": 76,
+      "group_count": {
+        "domain": 76,
+        "endpoint": 0,
+        "origins": 0
+      }
+    },
+    {
+      "name": "check_ip",
+      "source": "src/check_ip.py",
+      "rule_count": 27,
+      "group_count": {
+        "domain": 27,
+        "endpoint": 0,
+        "origins": 0
+      }
+    },
+    {
+      "name": "conn_check",
+      "source": "src/conn_check.conf",
+      "rule_count": 17,
+      "group_count": {
+        "domain": 15,
+        "endpoint": 2,
+        "origins": 0
+      }
+    },
+    {
+      "name": "gfwlist",
+      "source": "src/gfwlist.py",
+      "rule_count": 4127,
+      "group_count": {
+        "domain": 4127,
+        "endpoint": 0,
+        "origins": 0
+      }
+    },
+    {
+      "name": "microsoft_proxy",
+      "source": "src/microsoft_proxy.conf",
+      "rule_count": 3,
+      "group_count": {
+        "domain": 3,
+        "endpoint": 0,
+        "origins": 0
+      }
+    },
+    {
+      "name": "wikimedia",
+      "source": "src/wikimedia.conf",
+      "rule_count": 22,
+      "group_count": {
+        "domain": 22,
+        "endpoint": 0,
+        "origins": 0
+      }
+    }
+  ],
+  "targets": [
+    "surge",
+    "mihomo",
+    "shadowrocket",
+    "loon",
+    "sing-box"
+  ],
+  "failures": []
+}

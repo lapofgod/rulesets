@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "rules": [
+    {
+      "domain_suffix": [
+        "123169.xyz",
+        "ip.sb",
+        "ip.skk.moe",
+        "ip.api.skk.moe",
+        "ipinfo.io",
+        "ifconfig.co",
+        "ifconfig.me",
+        "icanhazip.com",
+        "myip.la",
+        "ip-api.com",
+        "api.myip.la",
+        "ip.gs",
+        "ippure.com",
+        "ip125.com",
+        "ping0.cc",
+        "whoer.net",
+        "ipleak.net",
+        "browserleaks.com",
+        "dnsleaktest.com",
+        "checkip.amazonaws.com",
+        "ipify.org",
+        "httpbin.org",
+        "whatismyipaddress.com",
+        "ident.me",
+        "test-ipv6.com",
+        "ip2location.com",
+        "ip2location.io"
+      ]
+    }
+  ]
+}
