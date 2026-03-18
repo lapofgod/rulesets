@@ -2,12 +2,8 @@ name: Generate Rules
 
 on:
   push:
-    paths:
-      - "src/**"
-      - "scripts/**"
-      - "pyproject.toml"
-      - "uv.lock"
-      - ".github/workflows/generate-rules.yml"
+    branches:
+      - main
   workflow_dispatch:
   schedule:
     - cron: "15 2 * * *"
@@ -38,18 +34,21 @@ jobs:
         with:
           path: |
             ${{ runner.temp }}/sing-box
-          key: sing-box-${{ runner.os }}-v1
+          key: sing-box-${{ runner.os }}-v1.9.1
 
       - name: Install sing-box
         run: |
+          set -euo pipefail
           INSTALL_DIR="${{ runner.temp }}/sing-box"
           mkdir -p "$INSTALL_DIR"
-          
+
           if [ ! -f "$INSTALL_DIR/sing-box" ]; then
-            cd "$INSTALL_DIR"
-            curl -fsSL "https://github.com/sagernet/sing-box/releases/download/v1.9.1/sing-box-1.9.1-linux-amd64.tar.gz" | tar xz
+            curl -fsSL "https://github.com/sagernet/sing-box/releases/download/v1.9.1/sing-box-1.9.1-linux-amd64.tar.gz" \
+              | tar xz -C "$INSTALL_DIR" --strip-components=1
           fi
-          
+
+          chmod +x "$INSTALL_DIR/sing-box"
+          "$INSTALL_DIR/sing-box" version
           echo "$INSTALL_DIR" >> "$GITHUB_PATH"
 
       - name: Create venv
