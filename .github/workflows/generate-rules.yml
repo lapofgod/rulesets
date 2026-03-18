@@ -63,9 +63,6 @@ jobs:
             --github-repo "${{ github.repository }}" \
             --publish-branch "$TARGET_BRANCH"
 
-      - name: Prepare publish script
-        run: chmod +x scripts/publish_generated_branch.sh
-
       - name: Commit and push
         env:
           TARGET_BRANCH: generated
