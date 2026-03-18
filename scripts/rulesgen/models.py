@@ -43,6 +43,7 @@ class RuleGroups:
 class GeneratorConfig:
     source_root: Path
     output_root: Path
+    cache_root: Path
     ruleset_baseline: str
     targets: tuple[str, ...]
     github_repo: str | None

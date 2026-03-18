@@ -6,11 +6,11 @@ import re
 import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
-from pathlib import Path
+
+from rulesgen.plugin_host import read_cache_text, write_cache_text
 
 GFWLIST_URL = "https://raw.githubusercontent.com/gfwlist/gfwlist/master/gfwlist.txt"
-CACHE_DIR = Path(__file__).resolve().parent.parent / "cache"
-GFWLIST_CACHE_FILE = CACHE_DIR / "gfwlist_raw.txt"
+GFWLIST_CACHE_NAME = "gfwlist_raw.txt"
 FETCH_TIMEOUTS = [8, 12, 20]
 FETCH_RETRY_BACKOFF_SECONDS = 0.8
 
@@ -27,17 +27,13 @@ def decode_gfwlist_payload(data: bytes) -> str:
 
 
 def save_gfwlist_cache(content: str) -> None:
-    CACHE_DIR.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
-    GFWLIST_CACHE_FILE.write_text(f"! cached_at={stamp}\n{content}\n", encoding="utf-8")
+    write_cache_text(GFWLIST_CACHE_NAME, f"! cached_at={stamp}\n{content}\n")
 
 
 def load_gfwlist_cache() -> str | None:
-    if not GFWLIST_CACHE_FILE.exists():
-        return None
-    try:
-        content = GFWLIST_CACHE_FILE.read_text(encoding="utf-8")
-    except Exception:
+    content = read_cache_text(GFWLIST_CACHE_NAME)
+    if content is None:
         return None
 
     if not content.strip():

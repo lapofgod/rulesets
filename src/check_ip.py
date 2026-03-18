@@ -7,11 +7,11 @@ import time
 import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
-from pathlib import Path
+
+from rulesgen.plugin_host import read_cache_text, write_cache_text
 
 TEST_IPV6_MIRRORS_URL = "https://test-ipv6.com/mirrors.html.en_US"
-CACHE_DIR = Path(__file__).resolve().parent.parent / "cache"
-MIRROR_CACHE_FILE = CACHE_DIR / "check_ip_mirrors.json"
+MIRROR_CACHE_NAME = "check_ip_mirrors.json"
 FETCH_TIMEOUTS = [8, 12, 20]
 FETCH_RETRY_BACKOFF_SECONDS = 0.8
 
@@ -68,11 +68,12 @@ def fetch_text_with_retry(url: str) -> str:
 
 
 def load_mirror_cache() -> list[str]:
-    if not MIRROR_CACHE_FILE.exists():
+    cache_text = read_cache_text(MIRROR_CACHE_NAME)
+    if cache_text is None:
         return []
 
     try:
-        payload = json.loads(MIRROR_CACHE_FILE.read_text(encoding="utf-8"))
+        payload = json.loads(cache_text)
     except Exception:
         return []
 
@@ -85,12 +86,11 @@ def load_mirror_cache() -> list[str]:
 
 
 def save_mirror_cache(domains: list[str]) -> None:
-    CACHE_DIR.mkdir(parents=True, exist_ok=True)
     payload = {
         "updated_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
         "domains": sorted(set(domains)),
     }
-    MIRROR_CACHE_FILE.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    write_cache_text(MIRROR_CACHE_NAME, json.dumps(payload, ensure_ascii=False, indent=2) + "\n")
 
 
 def extract_js_object(text: str, marker: str) -> str | None:

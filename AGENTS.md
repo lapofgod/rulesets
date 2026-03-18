@@ -61,6 +61,7 @@ surge/endpoints/README.MD
 规则源格式：
 - `.conf`：按原有逻辑逐行解析；以 `#` 开头的行视为注释并忽略。
 - `.py`：必须导出 `generate_conf_lines()`，返回 `str` 或 `iterable[str]`；每行内容与 `.conf` 行格式一致。
+- `.py`：涉及缓存时应使用宿主提供的 API（`rulesgen.plugin_host`），不要在插件内自行拼接或管理 `cache/` 路径。
 
 冲突处理：
 - 若同名 `.conf` 与 `.py` 同时存在（如 `foo.conf` + `foo.py`），仅该项目标记为失败，不影响其他项目。

@@ -57,6 +57,7 @@ def build_config(args: argparse.Namespace) -> GeneratorConfig:
 
     source_root = Path(args.source_root).expanduser().resolve()
     output_root = Path(args.output_root).expanduser().resolve()
+    cache_root = source_root.parent / "cache"
 
     if not source_root.exists() or not source_root.is_dir():
         raise RuntimeError(f"--source-root does not exist or is not a directory: {source_root}")
@@ -65,6 +66,7 @@ def build_config(args: argparse.Namespace) -> GeneratorConfig:
     return GeneratorConfig(
         source_root=source_root,
         output_root=output_root,
+        cache_root=cache_root,
         ruleset_baseline=args.ruleset_baseline,
         targets=targets,
         github_repo=args.github_repo,

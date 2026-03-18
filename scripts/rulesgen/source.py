@@ -5,6 +5,7 @@ import re
 from pathlib import Path
 
 from .models import Bundle, Rule
+from .plugin_host import activate_context
 
 
 def normalize_kind(kind: str) -> str:
@@ -45,26 +46,27 @@ def parse_file(file_path: Path) -> list[Rule]:
     return rules
 
 
-def parse_python_file(file_path: Path) -> list[Rule]:
+def parse_python_file(file_path: Path, *, bundle_name: str, cache_root: Path) -> list[Rule]:
     module_name = f"rulesource_{file_path.stem}"
     spec = importlib.util.spec_from_file_location(module_name, file_path)
     if spec is None or spec.loader is None:
         raise RuntimeError(f"Unable to load module spec: {file_path}")
 
     module = importlib.util.module_from_spec(spec)
-    try:
-        spec.loader.exec_module(module)
-    except Exception as exc:
-        raise RuntimeError(f"Failed to execute python source '{file_path.name}': {exc}") from exc
+    with activate_context(bundle_name=bundle_name, source_file=file_path, cache_root=cache_root):
+        try:
+            spec.loader.exec_module(module)
+        except Exception as exc:
+            raise RuntimeError(f"Failed to execute python source '{file_path.name}': {exc}") from exc
 
-    generator = getattr(module, "generate_conf_lines", None)
-    if not callable(generator):
-        raise RuntimeError(f"'{file_path.name}' must define callable generate_conf_lines()")
+        generator = getattr(module, "generate_conf_lines", None)
+        if not callable(generator):
+            raise RuntimeError(f"'{file_path.name}' must define callable generate_conf_lines()")
 
-    try:
-        generated = generator()
-    except Exception as exc:
-        raise RuntimeError(f"generate_conf_lines() failed in '{file_path.name}': {exc}") from exc
+        try:
+            generated = generator()
+        except Exception as exc:
+            raise RuntimeError(f"generate_conf_lines() failed in '{file_path.name}': {exc}") from exc
 
     if isinstance(generated, str):
         raw_lines = generated.splitlines()
@@ -117,11 +119,11 @@ def iter_sources(source_root: Path) -> list[Bundle]:
     return entries
 
 
-def load_rules(bundle: Bundle) -> list[Rule]:
+def load_rules(bundle: Bundle, *, cache_root: Path) -> list[Rule]:
     if bundle.source_type == "conflict":
         raise RuntimeError(
             f"Conflicting sources for '{bundle.name}': both {bundle.name}.conf and {bundle.name}.py exist"
         )
     if bundle.source_type == "py":
-        return parse_python_file(bundle.source)
+        return parse_python_file(bundle.source, bundle_name=bundle.name, cache_root=cache_root)
     return parse_file(bundle.source)

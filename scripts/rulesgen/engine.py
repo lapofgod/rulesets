@@ -30,7 +30,7 @@ def run_generation(config: GeneratorConfig) -> int:
     for bundle in bundles:
         print(f"[INFO] Generating '{bundle.name}' from {bundle.source.name} ...")
         try:
-            rules = load_rules(bundle)
+            rules = load_rules(bundle, cache_root=config.cache_root)
             file_map = transformer.emit(
                 GenericRuleSet(bundle=bundle, rules=rules),
                 context=context,
