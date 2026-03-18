@@ -11,7 +11,7 @@ while [ "$#" -gt 0 ]; do
       shift
       ;;
     -h|--help)
-      echo "Usage: $0 [--dry-run] <target-branch> [publish-root]"
+      echo "Usage: $0 [--dry-run] <target-branch> [publish-root] [publish-subdir]"
       echo "  --dry-run   Run publish flow without commit/push"
       exit 0
       ;;
@@ -24,14 +24,20 @@ done
 
 TARGET_BRANCH="${POSITIONAL_ARGS[0]:-}"
 PUBLISH_ROOT="${POSITIONAL_ARGS[1]:-generated}"
+PUBLISH_SUBDIR="${POSITIONAL_ARGS[2]:-generated}"
 
 if [ -z "$TARGET_BRANCH" ]; then
-  echo "Usage: $0 [--dry-run] <target-branch> [publish-root]" >&2
+  echo "Usage: $0 [--dry-run] <target-branch> [publish-root] [publish-subdir]" >&2
   exit 1
 fi
 
 if [ ! -d "$PUBLISH_ROOT" ]; then
   echo "Publish root does not exist: $PUBLISH_ROOT" >&2
+  exit 1
+fi
+
+if [ -z "$PUBLISH_SUBDIR" ]; then
+  echo "Publish subdir must not be empty" >&2
   exit 1
 fi
 
@@ -54,27 +60,32 @@ else
   find . -mindepth 1 -maxdepth 1 ! -name ".git" -exec rm -rf {} +
 fi
 
+mkdir -p "$PUBLISH_SUBDIR"
+
 for entry in "$PUBLISH_DIR"/* "$PUBLISH_DIR"/.[!.]* "$PUBLISH_DIR"/..?*; do
   [ -e "$entry" ] || continue
   name="$(basename "$entry")"
   [ "$name" = ".git" ] && continue
-  cp -a "$entry" ./
+  cp -a "$entry" "$PUBLISH_SUBDIR"/
 done
 
 # CI-only safeguard: if a previously published artifact becomes empty in this run,
 # keep the file path as an empty file to avoid external URL 404.
 while IFS= read -r tracked; do
   [ -n "$tracked" ] || continue
-  if [ ! -f "$PUBLISH_DIR/$tracked" ] && [ -f "$tracked" ]; then
+  if [[ "$tracked" != "$PUBLISH_SUBDIR/"* ]]; then
+    continue
+  fi
+  case "$tracked" in
+    *.list|*.conf|*.yaml|*.json|*.srs) ;;
+    *) continue ;;
+  esac
+  relative="${tracked#$PUBLISH_SUBDIR/}"
+  if [ ! -f "$PUBLISH_DIR/$relative" ] && [ -f "$tracked" ]; then
     : > "$tracked"
   fi
 done < <(
-  git ls-files \
-    '*.list' \
-    '*.conf' \
-    '*.yaml' \
-    '*.json' \
-    '*.srs'
+  git ls-files
 )
 
 # Keep generated branch clean from Python cache artifacts.
@@ -99,7 +110,7 @@ if git diff --staged --quiet; then
 fi
 
 if [ "$DRY_RUN" -eq 1 ]; then
-  echo "[DRY-RUN] Changes prepared for branch '$TARGET_BRANCH' from '$PUBLISH_ROOT'."
+  echo "[DRY-RUN] Changes prepared for branch '$TARGET_BRANCH' from '$PUBLISH_ROOT' into '$PUBLISH_SUBDIR'."
   git diff --cached --name-status
   echo "[DRY-RUN] Skip commit and push."
   exit 0
