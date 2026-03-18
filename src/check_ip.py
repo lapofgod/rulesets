@@ -4,13 +4,12 @@ from __future__ import annotations
 import json
 import re
 import time
-import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 
 from rulesgen.plugin_host import read_cache_text, write_cache_text
 
-TEST_IPV6_MIRRORS_URL = "https://test-ipv6.com/mirrors.html.en_US"
+TEST_IPV6_SITES_JSON_URL = "https://raw.githubusercontent.com/falling-sky/source/master/sites/sites.json"
 MIRROR_CACHE_NAME = "check_ip_mirrors.json"
 FETCH_TIMEOUTS = [8, 12, 20]
 FETCH_RETRY_BACKOFF_SECONDS = 0.8
@@ -93,86 +92,6 @@ def save_mirror_cache(domains: list[str]) -> None:
     write_cache_text(MIRROR_CACHE_NAME, json.dumps(payload, ensure_ascii=False, indent=2) + "\n")
 
 
-def extract_js_object(text: str, marker: str) -> str | None:
-    assign = re.search(rf"{re.escape(marker)}\s*=\s*", text)
-    if not assign:
-        return None
-
-    brace_start = text.find("{", assign.end())
-    if brace_start < 0:
-        return None
-
-    depth = 0
-    in_string = False
-    escaped = False
-
-    for idx in range(brace_start, len(text)):
-        ch = text[idx]
-        if in_string:
-            if escaped:
-                escaped = False
-            elif ch == "\\":
-                escaped = True
-            elif ch == '"':
-                in_string = False
-            continue
-
-        if ch == '"':
-            in_string = True
-            continue
-
-        if ch == "{":
-            depth += 1
-        elif ch == "}":
-            depth -= 1
-            if depth == 0:
-                return text[brace_start : idx + 1]
-
-    return None
-
-
-def parse_js_object_as_dict(raw_object: str) -> dict:
-    try:
-        parsed = json.loads(raw_object)
-    except json.JSONDecodeError:
-        normalized = re.sub(r",\s*([}\]])", r"\1", raw_object)
-        parsed = json.loads(normalized)
-
-    if not isinstance(parsed, dict):
-        raise RuntimeError("Parsed payload is not a JSON object")
-    return parsed
-
-
-def candidate_index_js_urls(html: str) -> list[str]:
-    urls: list[str] = []
-    for src in re.findall(r"<script[^>]+src=[\"']([^\"']+)[\"']", html, flags=re.IGNORECASE):
-        if "index.js" in src:
-            urls.append(urllib.parse.urljoin(TEST_IPV6_MIRRORS_URL, src))
-
-    urls.extend(
-        [
-            urllib.parse.urljoin(TEST_IPV6_MIRRORS_URL, "/index.js.en_US"),
-            urllib.parse.urljoin(TEST_IPV6_MIRRORS_URL, "/index.js"),
-        ]
-    )
-
-    deduped: list[str] = []
-    seen: set[str] = set()
-    for url in urls:
-        if url not in seen:
-            seen.add(url)
-            deduped.append(url)
-    return deduped
-
-
-def parse_sites_payload(script_text: str) -> dict:
-    for marker in ["GIGO.sites_parsed", "sites_parsed"]:
-        payload = extract_js_object(script_text, marker)
-        if payload:
-            return parse_js_object_as_dict(payload)
-    raise RuntimeError("Could not locate sites_parsed payload")
-
-
 def normalize_domain_from_host(host: str) -> str | None:
     host = host.strip().lower().strip(".")
     if not host:
@@ -196,21 +115,13 @@ def is_cn_location(loc: str) -> bool:
 
 
 def dynamic_mirror_lines() -> list[str]:
-    html = fetch_text_with_retry(TEST_IPV6_MIRRORS_URL)
-    candidates = candidate_index_js_urls(html)
+    payload = json.loads(fetch_text_with_retry(TEST_IPV6_SITES_JSON_URL))
+    if not isinstance(payload, dict):
+        raise RuntimeError("sites.json payload is not a JSON object")
 
-    sites: dict | None = None
-    last_error: Exception | None = None
-    for script_url in candidates:
-        try:
-            sites = parse_sites_payload(fetch_text_with_retry(script_url))
-            break
-        except Exception as exc:
-            last_error = exc
-
-    if sites is None:
-        detail = str(last_error) if last_error else "unknown error"
-        raise RuntimeError(f"Failed to parse mirror payload: {detail}")
+    sites = payload.get("sites")
+    if not isinstance(sites, dict):
+        raise RuntimeError("sites.json missing 'sites' object")
 
     domains: set[str] = set()
     for item in sites.values():
