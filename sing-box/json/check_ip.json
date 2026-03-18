@@ -3,286 +3,62 @@
   "rules": [
     {
       "domain_suffix": [
-        "123169.xyz"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "ip.sb"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "ip.skk.moe"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "ip.api.skk.moe"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "ipinfo.io"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "ifconfig.co"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "ifconfig.me"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "icanhazip.com"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "myip.la"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "ip-api.com"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "api.myip.la"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "ip.gs"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "ippure.com"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "ip125.com"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "ping0.cc"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "whoer.net"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "ipleak.net"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "browserleaks.com"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "dnsleaktest.com"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "checkip.amazonaws.com"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "ipify.org"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "httpbin.org"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "whatismyipaddress.com"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "ident.me"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "test-ipv6.com"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "ip2location.com"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "ip2location.io"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "amsterdam.test-ipv6.com"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "chennai.test-ipv6.com"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "dallas.test-ipv6.com"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "frankfurt.test-ipv6.com"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "ip6.ro"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "ipv6.uz"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "losangeles.test-ipv6.com"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "miami.test-ipv6.com"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "osaka.test-ipv6.com"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "saopaulo.test-ipv6.com"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "singapore.test-ipv6.com"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "sixte.st"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "sydney.test-ipv6.com"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "test-ipv6.alpinedc.ch"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "test-ipv6.carnet.hr"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "test-ipv6.coloradointerlink.net"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "test-ipv6.cs.umd.edu"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "test-ipv6.cz"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "test-ipv6.datafiber.nl"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "test-ipv6.epic.network"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "test-ipv6.fratec.net"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "test-ipv6.freerangecloud.com"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "test-ipv6.hu"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "test-ipv6.in"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "test-ipv6.karsolink.com"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "test-ipv6.noroutetohost.net"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "test-ipv6.roedu.net"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "testipv6.de"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "tokyo.test-ipv6.com"
-      ]
-    },
-    {
-      "domain_suffix": [
+        "123169.xyz",
+        "ip.sb",
+        "ip.skk.moe",
+        "ip.api.skk.moe",
+        "ipinfo.io",
+        "ifconfig.co",
+        "ifconfig.me",
+        "icanhazip.com",
+        "myip.la",
+        "ip-api.com",
+        "api.myip.la",
+        "ip.gs",
+        "ippure.com",
+        "ip125.com",
+        "ping0.cc",
+        "whoer.net",
+        "ipleak.net",
+        "browserleaks.com",
+        "dnsleaktest.com",
+        "checkip.amazonaws.com",
+        "ipify.org",
+        "httpbin.org",
+        "whatismyipaddress.com",
+        "ident.me",
+        "test-ipv6.com",
+        "ip2location.com",
+        "ip2location.io",
+        "amsterdam.test-ipv6.com",
+        "chennai.test-ipv6.com",
+        "dallas.test-ipv6.com",
+        "frankfurt.test-ipv6.com",
+        "ip6.ro",
+        "ipv6.uz",
+        "losangeles.test-ipv6.com",
+        "miami.test-ipv6.com",
+        "osaka.test-ipv6.com",
+        "saopaulo.test-ipv6.com",
+        "singapore.test-ipv6.com",
+        "sixte.st",
+        "sydney.test-ipv6.com",
+        "test-ipv6.alpinedc.ch",
+        "test-ipv6.carnet.hr",
+        "test-ipv6.coloradointerlink.net",
+        "test-ipv6.cs.umd.edu",
+        "test-ipv6.cz",
+        "test-ipv6.datafiber.nl",
+        "test-ipv6.epic.network",
+        "test-ipv6.fratec.net",
+        "test-ipv6.freerangecloud.com",
+        "test-ipv6.hu",
+        "test-ipv6.in",
+        "test-ipv6.karsolink.com",
+        "test-ipv6.noroutetohost.net",
+        "test-ipv6.roedu.net",
+        "testipv6.de",
+        "tokyo.test-ipv6.com",
         "triplebit.org"
       ]
     }

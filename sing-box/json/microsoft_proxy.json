@@ -3,16 +3,8 @@
   "rules": [
     {
       "domain_suffix": [
-        "onedrive.live.com"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "onedrive.com"
-      ]
-    },
-    {
-      "domain_suffix": [
+        "onedrive.live.com",
+        "onedrive.com",
         "copilot.microsoft.com"
       ]
     }

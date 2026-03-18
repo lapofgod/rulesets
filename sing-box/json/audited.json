@@ -3,381 +3,81 @@
   "rules": [
     {
       "domain_suffix": [
-        "nyaa.si"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "nyaa.pantsu.cat"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "rarbg.to"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "thepiratebay.org"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "1337x.to"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "yts.mx"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "eztv.re"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "torproject.org"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "minghui.org"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "minghui.net"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "epochtimes.com"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "epochtimes.fr"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "epochtimes.de"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "epochtimes.jp"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "theepochtimes.com"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "epochweekly.com"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "dajiyuan.com"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "dajiyuan.eu"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "ntdtv.com"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "ntd.tv"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "falundafa.org"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "falunaz.net"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "falungong.org"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "zhengjian.org"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "xinsheng.net"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "dafahao.com"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "dafahao.org"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "shenyun.com"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "shenyunperformingarts.org"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "tiantibooks.org"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "tuidang.org"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "9ping.com"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "ninecommentaries.com"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "dongtaiwang.com"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "wujieliulan.com"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "wujie.net"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "edoors.com"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "jinpianwang.com"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "breakgfw.com"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "aboluowang.com"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "bannedbook.org"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "secretchina.com"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "kanzhongguo.com"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "renminbao.com"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "soundofhope.org"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "boxun.com"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "creaders.net"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "chinaaid.org"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "chinadigitaltimes.net"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "64tianwang.com"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "beijingspring.com"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "chengmingmag.com"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "chenpokongvip.com"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "minzhuzhongguo.org"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "yibaochina.com"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "hrichina.org"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "weijingsheng.org"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "huaglad.com"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "oneplusnews.com"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "botanwang.com"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "zhuichaguoji.org"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "pincong.rocks"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "talk.news.pts.org.tw"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "voachinese.com"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "rfa.org"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "rfi.fr"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "dw.com"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "nytimes.com"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "mingjingnews.com"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "mingjinglive.com"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "inmediahk.net"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "xizang-zhiye.org"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "tibetpost.net"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "uhrp.org"
-      ]
-    },
-    {
-      "domain_suffix": [
-        "uyghuramerican.org"
-      ]
-    },
-    {
-      "domain_suffix": [
+        "nyaa.si",
+        "nyaa.pantsu.cat",
+        "rarbg.to",
+        "thepiratebay.org",
+        "1337x.to",
+        "yts.mx",
+        "eztv.re",
+        "torproject.org",
+        "minghui.org",
+        "minghui.net",
+        "epochtimes.com",
+        "epochtimes.fr",
+        "epochtimes.de",
+        "epochtimes.jp",
+        "theepochtimes.com",
+        "epochweekly.com",
+        "dajiyuan.com",
+        "dajiyuan.eu",
+        "ntdtv.com",
+        "ntd.tv",
+        "falundafa.org",
+        "falunaz.net",
+        "falungong.org",
+        "zhengjian.org",
+        "xinsheng.net",
+        "dafahao.com",
+        "dafahao.org",
+        "shenyun.com",
+        "shenyunperformingarts.org",
+        "tiantibooks.org",
+        "tuidang.org",
+        "9ping.com",
+        "ninecommentaries.com",
+        "dongtaiwang.com",
+        "wujieliulan.com",
+        "wujie.net",
+        "edoors.com",
+        "jinpianwang.com",
+        "breakgfw.com",
+        "aboluowang.com",
+        "bannedbook.org",
+        "secretchina.com",
+        "kanzhongguo.com",
+        "renminbao.com",
+        "soundofhope.org",
+        "boxun.com",
+        "creaders.net",
+        "chinaaid.org",
+        "chinadigitaltimes.net",
+        "64tianwang.com",
+        "beijingspring.com",
+        "chengmingmag.com",
+        "chenpokongvip.com",
+        "minzhuzhongguo.org",
+        "yibaochina.com",
+        "hrichina.org",
+        "weijingsheng.org",
+        "huaglad.com",
+        "oneplusnews.com",
+        "botanwang.com",
+        "zhuichaguoji.org",
+        "pincong.rocks",
+        "talk.news.pts.org.tw",
+        "voachinese.com",
+        "rfa.org",
+        "rfi.fr",
+        "dw.com",
+        "nytimes.com",
+        "mingjingnews.com",
+        "mingjinglive.com",
+        "inmediahk.net",
+        "xizang-zhiye.org",
+        "tibetpost.net",
+        "uhrp.org",
+        "uyghuramerican.org",
         "dalailamaworld.com"
       ]
     }
