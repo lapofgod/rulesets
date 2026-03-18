@@ -60,19 +60,6 @@ else
   find . -mindepth 1 -maxdepth 1 ! -name ".git" -exec rm -rf {} +
 fi
 
-# Migration cleanup: remove legacy root-level artifacts that were published
-# before introducing publish subdirectory support.
-subdir_root="${PUBLISH_SUBDIR%%/*}"
-for entry in "$PUBLISH_DIR"/* "$PUBLISH_DIR"/.[!.]* "$PUBLISH_DIR"/..?*; do
-  [ -e "$entry" ] || continue
-  name="$(basename "$entry")"
-  [ "$name" = ".git" ] && continue
-  [ "$name" = "$subdir_root" ] && continue
-  if [ -e "$name" ]; then
-    rm -rf "$name"
-  fi
-done
-
 mkdir -p "$PUBLISH_SUBDIR"
 
 for entry in "$PUBLISH_DIR"/* "$PUBLISH_DIR"/.[!.]* "$PUBLISH_DIR"/..?*; do
