@@ -37,7 +37,6 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: "stable"
-          cache: false
 
       - name: Install sing-box
         run: |
@@ -68,4 +67,4 @@ jobs:
         env:
           TARGET_BRANCH: generated
         run: |
-          bash scripts/publish_generated_branch.sh "$TARGET_BRANCH" generated generated
+          bash scripts/publish_generated_branch.sh "$TARGET_BRANCH" generated
