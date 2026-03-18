@@ -3,16 +3,10 @@ from __future__ import annotations
 
 import json
 import re
-import time
-import urllib.request
-from datetime import datetime, timezone
 
-from rulesgen.plugin_host import read_cache_text, write_cache_text
+from rulesgen.plugin_host import fetch_text_with_retry_cache
 
 TEST_IPV6_SITES_JSON_URL = "https://raw.githubusercontent.com/falling-sky/source/master/sites/sites.json"
-MIRROR_CACHE_NAME = "check_ip_mirrors.json"
-FETCH_TIMEOUTS = [8, 12, 20]
-FETCH_RETRY_BACKOFF_SECONDS = 0.8
 
 STATIC_LINES = [
     "DOMAIN-SUFFIX,123169.xyz",
@@ -45,53 +39,6 @@ STATIC_LINES = [
 ]
 
 
-def fetch_text(url: str, timeout: int = 30) -> str:
-    req = urllib.request.Request(url, headers={"User-Agent": "rulesets-generator/1.0"})
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        return resp.read().decode("utf-8", errors="ignore")
-
-
-def fetch_text_with_retry(url: str) -> str:
-    last_error: Exception | None = None
-    for idx, timeout in enumerate(FETCH_TIMEOUTS, start=1):
-        try:
-            return fetch_text(url, timeout=timeout)
-        except Exception as exc:
-            last_error = exc
-            if idx < len(FETCH_TIMEOUTS):
-                # Exponential backoff for transient TLS/network spikes.
-                time.sleep(FETCH_RETRY_BACKOFF_SECONDS * idx)
-
-    detail = str(last_error) if last_error else "unknown error"
-    raise RuntimeError(f"fetch failed after {len(FETCH_TIMEOUTS)} attempts ({url}): {detail}")
-
-
-def load_mirror_cache() -> list[str]:
-    cache_text = read_cache_text(MIRROR_CACHE_NAME)
-    if cache_text is None:
-        return []
-
-    try:
-        payload = json.loads(cache_text)
-    except Exception:
-        return []
-
-    domains = payload.get("domains")
-    if not isinstance(domains, list):
-        return []
-
-    valid_domains = [d for d in domains if isinstance(d, str) and normalize_domain_from_host(d)]
-    return sorted(set(valid_domains))
-
-
-def save_mirror_cache(domains: list[str]) -> None:
-    payload = {
-        "updated_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
-        "domains": sorted(set(domains)),
-    }
-    write_cache_text(MIRROR_CACHE_NAME, json.dumps(payload, ensure_ascii=False, indent=2) + "\n")
-
-
 def normalize_domain_from_host(host: str) -> str | None:
     host = host.strip().lower().strip(".")
     if not host:
@@ -115,7 +62,10 @@ def is_cn_location(loc: str) -> bool:
 
 
 def dynamic_mirror_lines() -> list[str]:
-    payload = json.loads(fetch_text_with_retry(TEST_IPV6_SITES_JSON_URL))
+    payload_text, from_cache = fetch_text_with_retry_cache(
+        url=TEST_IPV6_SITES_JSON_URL,
+    )
+    payload = json.loads(payload_text)
     if not isinstance(payload, dict):
         raise RuntimeError("sites.json payload is not a JSON object")
 
@@ -137,7 +87,8 @@ def dynamic_mirror_lines() -> list[str]:
             domains.add(domain)
 
     sorted_domains = sorted(domains)
-    save_mirror_cache(sorted_domains)
+    if from_cache:
+        print("[WARN] check_ip.py using cached sites payload")
     return [f"DOMAIN-SUFFIX,{domain}" for domain in sorted_domains]
 
 
@@ -157,12 +108,6 @@ def generate_conf_lines() -> list[str]:
     try:
         lines.extend(dynamic_mirror_lines())
     except Exception as exc:
-        cached = load_mirror_cache()
-        if cached:
-            lines.extend(f"DOMAIN-SUFFIX,{domain}" for domain in cached)
-            print(f"[WARN] check_ip.py dynamic mirrors failed, using cache ({len(cached)}): {exc}")
-        else:
-            # Keep static fallback output when dynamic fetch fails.
-            print(f"[WARN] check_ip.py dynamic mirrors skipped (no cache): {exc}")
-
+        # Keep static fallback output when dynamic fetch/cache fails.
+        print(f"[WARN] check_ip.py dynamic mirrors skipped: {exc}")
     return dedupe_lines_keep_order(lines)
