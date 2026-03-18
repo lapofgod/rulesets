@@ -120,12 +120,17 @@ jobs:
               '*.srs'
           )
 
-          # Keep generated branch clean from Python cache artifacts.
+          # Whitelist mode: ignore everything except published artifacts.
           cat > .gitignore <<'EOF'
-          __pycache__/
-          *.pyc
-          *.pyo
-          cache/
+          *
+          !*/
+          !.gitignore
+          !manifest.json
+          !surge/**
+          !mihomo/**
+          !shadowrocket/**
+          !loon/**
+          !sing-box/**
           EOF
 
           # Remove accidentally tracked cache files from previous runs.

@@ -191,6 +191,9 @@ python scripts/generate_rules.py \
 额外规则：
 - 工作流固定只向 `generated` 分支提交产物，不会写回源码分支（例如 `main`）。
 - `main` 分支默认忽略本地产物目录 `generated/`。
+- 发布逻辑内联在 `.github/workflows/generate-rules.yml` 中（不再依赖独立发布脚本）。
+- 发布前会清理目标分支根目录下历史遗留的 `generated/` 目录，确保产物直接落在分支根目录。
+- 目标分支 `.gitignore` 使用白名单模式：默认忽略全部，仅放行 `.gitignore`、`manifest.json` 与各目标产物目录（`surge/`、`mihomo/`、`shadowrocket/`、`loon/`、`sing-box/`）。
 
 ## Agent Guidance
 
