@@ -36,6 +36,9 @@ STATIC_LINES = [
     "DOMAIN-SUFFIX,test-ipv6.com",
     "DOMAIN-SUFFIX,ip2location.com",
     "DOMAIN-SUFFIX,ip2location.io",
+    "DOMAIN-SUFFIX,ipwhois.io",
+    "DOMAIN-SUFFIX,ipwho.is",
+    "DOMAIN-SUFFIX,ipapi.is",
 ]
 
 
