@@ -45,9 +45,9 @@
     {
       "name": "gfwlist",
       "source": "src/gfwlist.py",
-      "rule_count": 4131,
+      "rule_count": 4132,
       "group_count": {
-        "domain": 4131,
+        "domain": 4132,
         "endpoint": 0,
         "origins": 0
       }

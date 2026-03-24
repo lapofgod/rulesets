@@ -1,6 +1,6 @@
 # Auto-generated file. Do not edit manually.
 # Rule count: 13
-# Generated at: 2026-03-23T04:36:44.604Z
+# Generated at: 2026-03-24T04:26:32.151Z
 payload:
 - DOMAIN-WILDCARD,*p2p*.chat.bilibili.com
 - DOMAIN-WILDCARD,*tracker*.chat.bilibili.com
