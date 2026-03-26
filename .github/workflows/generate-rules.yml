@@ -6,7 +6,7 @@ on:
       - main
   workflow_dispatch:
   schedule:
-    - cron: "15 2 * * *"
+    - cron: '15 2 * * *'
 
 permissions:
   contents: write
@@ -65,7 +65,7 @@ jobs:
           TARGET_BRANCH: generated
         run: |
           .venv/bin/python scripts/generate_rules.py \
-            --source-root src \
+            --source-root rules \
             --output-root generated \
             --ruleset-baseline mihomo \
             --github-repo "${{ github.repository }}" \
