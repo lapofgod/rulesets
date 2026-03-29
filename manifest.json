@@ -5,10 +5,10 @@
     {
       "name": "_personal_reject",
       "source": "rules/_personal_reject.conf",
-      "rule_count": 51,
+      "rule_count": 52,
       "group_count": {
         "domain": 1,
-        "endpoint": 50,
+        "endpoint": 51,
         "origins": 0
       }
     },
