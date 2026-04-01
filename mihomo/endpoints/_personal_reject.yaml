@@ -1,10 +1,12 @@
 # Auto-generated file. Do not edit manually.
-# Rule count: 51
-# Generated at: 2026-04-01T05:06:34.692Z
+# Rule count: 53
+# Generated at: 2026-04-01T08:59:28.289Z
 payload:
 - DOMAIN-WILDCARD,*p2p*.chat.bilibili.com
 - DOMAIN-WILDCARD,*tracker*.chat.bilibili.com
 - IP-CIDR,119.29.29.98/31
+- IP-CIDR,119.29.29.94/31
+- IP-CIDR,119.28.28.94/31
 - IP-CIDR,39.156.140.30/32
 - IP-CIDR,39.156.140.47/32
 - IP-CIDR,39.156.140.245/32
