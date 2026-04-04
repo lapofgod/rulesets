@@ -44,6 +44,14 @@ This directory is auto-generated.
 - testingcf.jsdelivr.net: https://testingcf.jsdelivr.net/gh/lapofgod/rulesets@generated/surge/domains/gfwlist.list
 - gh-proxy: https://gh-proxy.org/https://github.com/lapofgod/rulesets/blob/generated/surge/domains/gfwlist.list
 
+### google_search.list
+
+- raw.githubusercontent.com: https://raw.githubusercontent.com/lapofgod/rulesets/generated/surge/domains/google_search.list
+- cdn.jsdelivr.net: https://cdn.jsdelivr.net/gh/lapofgod/rulesets@generated/surge/domains/google_search.list
+- fastly.jsdelivr.net: https://fastly.jsdelivr.net/gh/lapofgod/rulesets@generated/surge/domains/google_search.list
+- testingcf.jsdelivr.net: https://testingcf.jsdelivr.net/gh/lapofgod/rulesets@generated/surge/domains/google_search.list
+- gh-proxy: https://gh-proxy.org/https://github.com/lapofgod/rulesets/blob/generated/surge/domains/google_search.list
+
 ### microsoft_proxy.list
 
 - raw.githubusercontent.com: https://raw.githubusercontent.com/lapofgod/rulesets/generated/surge/domains/microsoft_proxy.list

@@ -76,6 +76,20 @@ rule-providers:
     interval: 86400
 ```
 
+### google_search.list
+- Format: text
+- Behavior: domain
+```yaml
+rule-providers:
+  google_search_domains:
+    type: http
+    behavior: domain
+    format: text
+    url: https://raw.githubusercontent.com/lapofgod/rulesets/generated/mihomo/domains/google_search.list
+    path: ./ruleset/google_search.list
+    interval: 86400
+```
+
 ### microsoft_proxy.list
 - Format: text
 - Behavior: domain
@@ -145,6 +159,14 @@ rule-providers:
 - fastly.jsdelivr.net: https://fastly.jsdelivr.net/gh/lapofgod/rulesets@generated/mihomo/domains/gfwlist.list
 - testingcf.jsdelivr.net: https://testingcf.jsdelivr.net/gh/lapofgod/rulesets@generated/mihomo/domains/gfwlist.list
 - gh-proxy: https://gh-proxy.org/https://github.com/lapofgod/rulesets/blob/generated/mihomo/domains/gfwlist.list
+
+### google_search.list
+
+- raw.githubusercontent.com: https://raw.githubusercontent.com/lapofgod/rulesets/generated/mihomo/domains/google_search.list
+- cdn.jsdelivr.net: https://cdn.jsdelivr.net/gh/lapofgod/rulesets@generated/mihomo/domains/google_search.list
+- fastly.jsdelivr.net: https://fastly.jsdelivr.net/gh/lapofgod/rulesets@generated/mihomo/domains/google_search.list
+- testingcf.jsdelivr.net: https://testingcf.jsdelivr.net/gh/lapofgod/rulesets@generated/mihomo/domains/google_search.list
+- gh-proxy: https://gh-proxy.org/https://github.com/lapofgod/rulesets/blob/generated/mihomo/domains/google_search.list
 
 ### microsoft_proxy.list
 

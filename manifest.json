@@ -53,6 +53,16 @@
       }
     },
     {
+      "name": "google_search",
+      "source": "rules/google_search.conf",
+      "rule_count": 186,
+      "group_count": {
+        "domain": 186,
+        "endpoint": 0,
+        "origins": 0
+      }
+    },
+    {
       "name": "microsoft_proxy",
       "source": "rules/microsoft_proxy.conf",
       "rule_count": 3,
