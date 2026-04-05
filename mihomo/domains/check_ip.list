@@ -1,6 +1,6 @@
 # Auto-generated file. Do not edit manually.
-# Rule count: 60
-# Generated at: 2026-04-05T04:44:01.647Z
+# Rule count: 61
+# Generated at: 2026-04-05T06:05:40.815Z
 
 +.123169.xyz
 +.amsterdam.test-ipv6.com
@@ -26,6 +26,7 @@
 +.ip2location.io
 +.ip6.ro
 +.ipapi.is
++.ipdata.co
 +.ipify.org
 +.ipinfo.io
 +.ipleak.net
