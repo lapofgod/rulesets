@@ -1,0 +1,6 @@
+#!name=MitM All Domains
+#!desc=Enable MitM on all domains except known SSL-pinned ones.
+#!category=Debug
+
+[MITM]
+hostname = -*.apple.com, -*.icloud.com, -*.mzstatic.com, -*.crashlytics.com, -*.facebook.com, -*.instagram.com, *

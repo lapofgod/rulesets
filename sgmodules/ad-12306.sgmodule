@@ -1,0 +1,10 @@
+#!name=12306 Ad Remove
+#!desc=Remove splash screen and in app ads in 12306 app
+#!category=Enhancement
+
+[Script]
+ad-12306.splash = type=http-request, pattern=^https:\/\/ad\.12306\.cn\/ad\/ser\/getAdList$, script-path=https://cdn.jsdelivr.net/gh/lapofgod/rulesets@refs/heads/main/sgmodules/ad-12306/splash.js, requires-body=true
+ad-12306.in-app = type=http-request, pattern=^https:\/\/mobile\.12306\.cn\/otsmobile\/app\/mgs\/mgw\.htm$, script-path=https://cdn.jsdelivr.net/gh/lapofgod/rulesets@refs/heads/main/sgmodules/ad-12306/in-app.js
+
+[MITM]
+hostname = %APPEND% ad.12306.cn, mobile.12306.cn
