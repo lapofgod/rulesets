@@ -1,0 +1,9 @@
+#!name=Redirect google.cn
+#!desc=Reditect google.cn search queries to google.com, to workaround Safari defaulting to google.cn for China region iPhones
+#!category=Enhancement
+
+[URL Rewrite]
+^https?://(www.)?(g|google)\.cn/search https://www.google.com/search 307
+
+[MITM]
+hostname = %APPEND% g.cn, www.g.cn, google.cn, www.google.cn
