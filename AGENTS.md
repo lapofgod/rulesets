@@ -21,7 +21,7 @@ Single Source of Truth: `rules/*.conf` + `rules/*.py`（仅非隐藏文件）。
 ├── rules/
 │   ├── *.conf             # 静态规则源（Mihomo 规则 + URL-REGEX + USER-AGENT）
 │   └── *.py               # 可插拔规则源，需实现 generate_conf_lines()
-├── scripts/
+├── src/
 │   └── generate_rules.py  # 生成器
 ├── pyproject.toml         # 依赖与项目元数据（uv）
 ├── generated/             # 本地生成产物（发布时会展开到 generated 分支根目录）
@@ -149,7 +149,7 @@ domain set 语义：
 uv venv .venv
 source .venv/bin/activate
 uv sync
-python scripts/generate_rules.py \
+python src/generate_rules.py \
     --source-root rules \
     --output-root generated \
     --ruleset-baseline mihomo \
@@ -172,7 +172,7 @@ sing-box 相关：
 - 本地未安装 `sing-box` 时，可使用：
 
 ```bash
-python scripts/generate_rules.py \
+python src/generate_rules.py \
     --source-root rules \
     --output-root generated \
     --ruleset-baseline mihomo \
@@ -184,7 +184,7 @@ python scripts/generate_rules.py \
 仅生成部分目标：
 
 ```bash
-python scripts/generate_rules.py \
+python src/generate_rules.py \
     --source-root rules \
     --output-root generated \
     --ruleset-baseline mihomo \
@@ -196,7 +196,7 @@ python scripts/generate_rules.py \
 可选发布参数（用于 README 外链生成）：
 
 ```bash
-python scripts/generate_rules.py \
+python src/generate_rules.py \
     --source-root rules \
     --output-root generated \
     --ruleset-baseline mihomo \
@@ -210,7 +210,7 @@ python scripts/generate_rules.py \
 
 触发方式：
 
-- push（`rules/**`、`scripts/**` 变更）
+- push（`rules/**`、`src/**` 变更）
 - schedule（每日 UTC 02:15）
 - 手动触发（`workflow_dispatch`）
 

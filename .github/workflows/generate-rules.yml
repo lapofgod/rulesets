@@ -64,7 +64,7 @@ jobs:
         env:
           TARGET_BRANCH: generated
         run: |
-          .venv/bin/python scripts/generate_rules.py \
+          .venv/bin/python src/generate_rules.py \
             --source-root rules \
             --output-root generated \
             --ruleset-baseline mihomo \
