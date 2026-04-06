@@ -30,6 +30,7 @@ Single Source of Truth: `rules/*.conf` + `rules/*.py`（仅非隐藏文件）。
 │   ├── shadowrocket/<规则名>/
 │   ├── loon/<规则名>/
 │   ├── sing-box/<规则名>/
+│   ├── sgmodules/         # 从仓库根目录 sgmodules/ 原样复制
 │   └── manifest.json
 └── .github/workflows/
     └── generate-rules.yml
@@ -225,6 +226,7 @@ python src/generate_rules.py \
 - 发布逻辑内联在 `.github/workflows/generate-rules.yml` 中（不再依赖独立发布脚本）。
 - 发布前会清理目标分支根目录下历史遗留的 `generated/` 目录，确保产物直接落在分支根目录。
 - 目标分支 `.gitignore` 使用白名单模式：默认忽略全部，仅放行 `.gitignore`、`manifest.json` 与各目标产物目录（`surge/`、`mihomo/`、`shadowrocket/`、`loon/`、`sing-box/`）。
+- `sgmodules/` 目录会在生成阶段从仓库根目录原样复制到产物目录，并随发布同步到 `generated` 分支。
 
 ## Agent Guidance
 

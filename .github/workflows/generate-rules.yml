@@ -126,7 +126,9 @@ jobs:
               '*.conf' \
               '*.yaml' \
               '*.json' \
-              '*.srs'
+              '*.srs' \
+              '*.sgmodule' \
+              '*.js'
           )
 
           # Whitelist mode: ignore everything except published artifacts.
@@ -140,6 +142,7 @@ jobs:
           !shadowrocket/**
           !loon/**
           !sing-box/**
+          !sgmodules/**
           EOF
 
           git add -A .
@@ -171,6 +174,8 @@ jobs:
               '*.yaml' \
               '*.json' \
               '*.srs' \
+              '*.sgmodule' \
+              '*.js' \
               'README.MD' \
               '*/README.MD' \
               'manifest.json' \

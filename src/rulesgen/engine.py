@@ -1,11 +1,24 @@
 from __future__ import annotations
 
 import shutil
+from pathlib import Path
 
 from .models import Bundle, EmitContext, GenerationFailure, GeneratorConfig, GenericRuleSet, Rule
 from .source import iter_sources, load_rules
 from .targets import GenericToTargetTransformer
 from .writers import write_manifest, write_type_readme
+
+
+def copy_sgmodules(source_root: Path, output_root: Path) -> None:
+    repo_root = source_root.parent
+    sgmodules_src = repo_root / "sgmodules"
+    if not sgmodules_src.exists() or not sgmodules_src.is_dir():
+        print(f"[INFO] Skip sgmodules copy: {sgmodules_src} does not exist")
+        return
+
+    sgmodules_dst = output_root / "sgmodules"
+    shutil.copytree(sgmodules_src, sgmodules_dst, dirs_exist_ok=True)
+    print(f"[INFO] Copied sgmodules to {sgmodules_dst}")
 
 
 def run_generation(config: GeneratorConfig) -> int:
@@ -64,6 +77,8 @@ def run_generation(config: GeneratorConfig) -> int:
         entries,
         failures,
     )
+
+    copy_sgmodules(config.source_root, config.output_root)
 
     if failures:
         failed_names = ", ".join(item.name for item in failures)
