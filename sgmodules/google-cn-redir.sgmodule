@@ -3,7 +3,8 @@
 #!category=Enhancement
 
 [URL Rewrite]
-^https?://(www.)?(g|google)\.cn/(m|search) https://www.google.com/search 307
+^https?://(www.)?(g|google)\.cn/search https://www.google.com/search 307
+^https?://(www.)?(g|google)\.cn/m https://www.google.com/m 307
 
 [MITM]
 hostname = %APPEND% g.cn, www.g.cn, google.cn, www.google.cn
